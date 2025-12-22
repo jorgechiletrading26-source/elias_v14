@@ -8669,6 +8669,7 @@ function UserManagementSection({
     try {
   const students = LocalStorageManager.getStudentsForYear(selectedYear);
   const teachers = LocalStorageManager.getTeachersForYear(selectedYear);
+  const guardians = LocalStorageManager.getGuardiansForYear(selectedYear);
   const mainUsers = JSON.parse(localStorage.getItem('smart-student-users') || '[]');
   const adminsStorage = JSON.parse(localStorage.getItem('smart-student-administrators') || '[]');
 
@@ -8743,7 +8744,29 @@ function UserManagementSection({
         }
       });
 
-      const rolePriority: Record<string, number> = { admin: 0, teacher: 1, student: 2 };
+      // Agregar apoderados DEL AÑO SELECCIONADO
+      guardians.forEach((guardian: any) => {
+        if (guardian && guardian.username) {
+          const mainUser = mainUsers.find((u: any) => u && u.username === guardian.username);
+          userMap.set(guardian.username, {
+            id: guardian.id || crypto.randomUUID(),
+            username: guardian.username || 'Sin usuario',
+            name: guardian.name || 'Sin nombre',
+            email: guardian.email || '',
+            password: mainUser?.password || 'N/A',
+            type: 'guardian',
+            role: 'guardian',
+            uniqueCode: guardian.uniqueCode || '',
+            phone: guardian.phone || '',
+            studentIds: guardian.studentIds || [],
+            relationship: guardian.relationship || '',
+            createdAt: guardian.createdAt || new Date(),
+            isActive: guardian.isActive !== undefined ? guardian.isActive : true
+          });
+        }
+      });
+
+      const rolePriority: Record<string, number> = { admin: 0, teacher: 1, student: 2, guardian: 3 };
       const users = Array.from(userMap.values()).sort((a, b) => {
         const pa = rolePriority[a.type] ?? 99;
         const pb = rolePriority[b.type] ?? 99;
@@ -8915,6 +8938,14 @@ function UserManagementSection({
               className={filterRole === 'student' ? 'bg-green-600 text-white hover:bg-green-500' : 'border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800 transition-colors dark:border-green-500 dark:text-green-300 dark:hover:bg-green-900/40 dark:hover:text-green-200'}
             >
               {translate('configFilterStudents') || 'Estudiantes'} ({allUsers.filter(u => u.type === 'student').length})
+            </Button>
+            <Button
+              variant={filterRole === 'guardian' ? 'default' : 'outline'}
+              onClick={() => setFilterRole('guardian')}
+              size="sm"
+              className={filterRole === 'guardian' ? 'bg-purple-600 text-white hover:bg-purple-500' : 'border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800 transition-colors dark:border-purple-500 dark:text-purple-300 dark:hover:bg-purple-900/40 dark:hover:text-purple-200'}
+            >
+              {translate('configFilterGuardians') || 'Apoderados'} ({allUsers.filter(u => u.type === 'guardian').length})
             </Button>
           </div>
         </div>
