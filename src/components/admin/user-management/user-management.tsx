@@ -83,6 +83,7 @@ export default function UserManagement() {
   const [administrators, setAdministrators] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
+  const [studentAssignments, setStudentAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   // Años disponibles y año seleccionado
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -100,12 +101,15 @@ export default function UserManagement() {
     username: '',
     name: '',
     email: '',
-  rut: '',
+    rut: '',
     password: '',
     confirmPassword: '',
     role: 'student',
     courseId: '',
-    sectionId: ''
+    sectionId: '',
+    phone: '',
+    studentIds: [],
+    relationship: 'tutor'
   });
 
   // Selected subjects for teachers
@@ -241,6 +245,10 @@ export default function UserManagement() {
       setAdministrators(migratedAdmins);
   setCourses(coursesData);
   setSections(sectionsData);
+  
+      // Cargar asignaciones de estudiantes
+      const assignmentsData = LocalStorageManager.getStudentAssignmentsForYear(y) || [];
+      setStudentAssignments(assignmentsData);
 
       // Asegurar que las asignaciones de estudiantes existan y estén sincronizadas
       try {
@@ -835,13 +843,16 @@ export default function UserManagement() {
     setUserForm({
       username: '',
       name: '',
-  rut: '',
+      rut: '',
       email: '',
       password: '',
       confirmPassword: '',
       role: 'student',
       courseId: '',
-      sectionId: ''
+      sectionId: '',
+      phone: '',
+      studentIds: [],
+      relationship: 'tutor'
     });
     setSelectedSubjects([]);
     setSelectedStudentIds([]);
@@ -1043,7 +1054,10 @@ export default function UserManagement() {
           </Button>
           <UserFormDialog
             open={showUserDialog}
-            onOpenChange={setShowUserDialog}
+            onOpenChange={(open) => {
+              if (!open) resetForm();
+              setShowUserDialog(open);
+            }}
             form={{
               name: userForm.name,
               rut: userForm.rut,
@@ -1084,6 +1098,7 @@ export default function UserManagement() {
             availableSections={sections}
             availableSubjects={getAllAvailableSubjects()}
             availableStudents={students}
+            studentAssignments={studentAssignments}
             showAutoGenerate={!editingUser}
             autoGenerateChecked={autoGenerateCredentials}
             onToggleAutoGenerate={(checked) => setAutoGenerateCredentials(checked)}

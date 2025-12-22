@@ -44,6 +44,7 @@ export function UserFormDialog({
   availableSections = [],
   availableSubjects = getAllAvailableSubjects(),
   availableStudents = [],
+  studentAssignments = [],
   showAutoGenerate = true,
   autoGenerateChecked = false,
   onToggleAutoGenerate,
@@ -59,6 +60,7 @@ export function UserFormDialog({
   availableSections?: any[];
   availableSubjects?: SubjectColor[];
   availableStudents?: any[];
+  studentAssignments?: any[];
   showAutoGenerate?: boolean;
   autoGenerateChecked?: boolean;
   onToggleAutoGenerate?: (checked: boolean) => void;
@@ -77,19 +79,24 @@ export function UserFormDialog({
   };
 
   // Filter students based on search term, course and section
+  // Check both direct student properties AND student assignments
   const filteredStudents = availableStudents.filter((student: any) => {
+    // Get student's course and section from assignments if not directly on object
+    const studentCourseId = student.courseId || studentAssignments.find((a: any) => a.studentId === student.id)?.courseId;
+    const studentSectionId = student.sectionId || studentAssignments.find((a: any) => a.studentId === student.id)?.sectionId;
+    
     // Filter by course if selected
     if (filterCourseId) {
       if (filterCourseId === 'unassigned') {
         // Show only students without course assigned
-        if (student.courseId) return false;
+        if (studentCourseId) return false;
       } else {
         // Show only students with the selected course
-        if (student.courseId !== filterCourseId) return false;
+        if (studentCourseId !== filterCourseId) return false;
       }
     }
     // Filter by section if selected
-    if (filterSectionId && student.sectionId !== filterSectionId) return false;
+    if (filterSectionId && studentSectionId !== filterSectionId) return false;
     // Filter by search term
     if (!studentSearchTerm) return true;
     const searchLower = studentSearchTerm.toLowerCase();
@@ -383,6 +390,8 @@ export function UserFormDialog({
               <Label htmlFor="phone">{translate('userManagementPhone') || 'Teléfono'}</Label>
               <Input
                 id="phone"
+                type="tel"
+                inputMode="tel"
                 value={form.phone || ''}
                 onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder={translate('userManagementPhonePlaceholder') || '+56 9 1234 5678'}
@@ -497,13 +506,22 @@ export function UserFormDialog({
                   <p className="text-xs text-muted-foreground text-center py-4">
                     {translate('userManagementNoStudentsInSystem') || 'No hay estudiantes registrados en el sistema'}
                   </p>
-                ) : filteredStudents.length === 0 ? (
+                ) : filteredStudents.length === 0 && (filterCourseId || filterSectionId || studentSearchTerm) ? (
                   <div className="text-center py-4">
                     <p className="text-xs text-muted-foreground">
                       {translate('userManagementNoStudentsFound') || 'No se encontraron estudiantes'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {translate('userManagementTryDifferentFilter') || 'Intenta con otro filtro o selecciona "Todos los cursos"'}
+                    </p>
+                    <p className="text-xs text-purple-500 mt-2">
+                      {translate('userManagementTotalStudentsAvailable') || 'Total de estudiantes'}: {availableStudents.length}
+                    </p>
+                  </div>
+                ) : filteredStudents.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-xs text-muted-foreground">
+                      {translate('userManagementNoStudentsWithCourse') || 'Los estudiantes no tienen curso/sección asignados'}
                     </p>
                     <p className="text-xs text-purple-500 mt-2">
                       {translate('userManagementTotalStudentsAvailable') || 'Total de estudiantes'}: {availableStudents.length}

@@ -1835,6 +1835,7 @@ export default function Configuration() {
     admins: number;
     teachers: number;
     students: number;
+    guardians: number;
     studentsUpdated?: number;
     errors: number;
     errorMessages?: string[];
@@ -1861,8 +1862,8 @@ export default function Configuration() {
   const [createUserFormData, setCreateUserFormData] = useState({
     name: '',
     email: '',
-    role: 'student' as 'student' | 'teacher' | 'admin',
-  rut: '',
+    role: 'student' as 'student' | 'teacher' | 'admin' | 'guardian',
+    rut: '',
     username: '',
     password: '',
     confirmPassword: '',
@@ -1870,7 +1871,11 @@ export default function Configuration() {
     courseId: '',
     section: '',
     subject: '',
-    selectedSubjects: [] as string[]
+    selectedSubjects: [] as string[],
+    // Guardian-specific fields
+    phone: '',
+    studentIds: [] as string[],
+    relationship: 'tutor' as 'mother' | 'father' | 'tutor' | 'other'
   });
 
   // Data states for form dropdowns
@@ -4939,8 +4944,8 @@ export default function Configuration() {
       
       // Mostrar notificación
       toast({
-        title: translate('configImportSuccessTitle') || 'Importación exitosa',
-        description: `Creados: ${totalCreated} usuarios. Actualizados: ${createdUsers.studentsUpdated}. Errores: ${createdUsers.errors}`,
+        title: translate('configImportSuccessTitle') || 'Import Successful',
+        description: `${translate('configImportCreated') || 'Created'}: ${totalCreated} ${translate('configImportUsers') || 'users'}. ${translate('configImportUpdated') || 'Updated'}: ${createdUsers.studentsUpdated}. ${translate('configImportErrors') || 'Errors'}: ${createdUsers.errors}`,
         variant: createdUsers.errors > 0 ? 'default' : 'default'
       });
 
@@ -4985,6 +4990,7 @@ export default function Configuration() {
             admins: 0,
             teachers: 0,
             students: count,
+            guardians: 0,
             studentsUpdated: 0,
             errors: 0,
             errorMessages: [],
@@ -6989,7 +6995,8 @@ export default function Configuration() {
         admins: createdAdmins,
         teachers: createdTeachers,
         students: createdStudents,
-  errors: errors.length,
+        guardians: 0,
+        errors: errors.length,
         errorMessages: errors,
         timestamp: new Date().toISOString()
       });
@@ -7235,9 +7242,22 @@ export default function Configuration() {
         return;
       }
 
+      // Guardian validation
+      if (createUserFormData.role === 'guardian') {
+        const studentIds = (createUserFormData as any).studentIds as string[] | undefined;
+        if (!studentIds || studentIds.length === 0) {
+          toast({
+            title: translate('error') || 'Error',
+            description: translate('userManagementSelectStudentForGuardian') || 'Selecciona al menos un estudiante para el apoderado',
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+
       // Generate credentials if auto-generate is enabled
       const username = createUserFormData.autoGenerate 
-        ? UsernameGenerator.generateFromName(createUserFormData.name, createUserFormData.role)
+        ? UsernameGenerator.generateFromName(createUserFormData.name, createUserFormData.role as any)
         : createUserFormData.username.trim();
       
       const password = createUserFormData.autoGenerate
@@ -7297,6 +7317,36 @@ export default function Configuration() {
         const administrators = JSON.parse(localStorage.getItem('smart-student-administrators') || '[]');
         const updatedAdministrators = [...administrators, newAdmin];
         localStorage.setItem('smart-student-administrators', JSON.stringify(updatedAdministrators));
+      } else if (createUserFormData.role === 'guardian') {
+        const studentIds = ((createUserFormData as any).studentIds || []) as string[];
+        const relationship = (((createUserFormData as any).relationship || 'tutor') as any);
+        const phone = String((createUserFormData as any).phone || '');
+
+        const newGuardian = {
+          ...baseUser,
+          uniqueCode: EducationCodeGenerator.generateGuardianCode(),
+          role: 'guardian',
+          phone,
+          studentIds: [...studentIds],
+          relationship
+        };
+
+        const guardians = LocalStorageManager.getGuardiansForYear(selectedYear);
+        LocalStorageManager.setGuardiansForYear(selectedYear, [...guardians, newGuardian]);
+
+        // Crear relaciones apoderado-estudiante
+        const existingRelations = LocalStorageManager.getGuardianStudentRelationsForYear(selectedYear) || [];
+        const newRelations = studentIds.map((studentId, index) => ({
+          id: `gsr-${newGuardian.id}-${studentId}-${Date.now()}`,
+          guardianId: newGuardian.id,
+          studentId,
+          relationship,
+          isPrimary: index === 0,
+          createdAt: new Date()
+        }));
+        LocalStorageManager.setGuardianStudentRelationsForYear(selectedYear, [...existingRelations, ...newRelations]);
+
+        try { window.dispatchEvent(new CustomEvent('guardiansUpdated', { detail: { year: selectedYear, action: 'create' } })); } catch {}
       }
 
       // Save to main users array
@@ -7350,6 +7400,23 @@ export default function Configuration() {
       } else if (createUserFormData.role === 'admin') {
         // ✅ Los administradores no necesitan cursos específicos pero sí el array vacío
         courseNames = [];
+      } else if (createUserFormData.role === 'guardian') {
+        // Para apoderados, derivar cursos desde los estudiantes (si existen), si no dejar vacío
+        try {
+          const students = LocalStorageManager.getStudentsForYear(selectedYear) || [];
+          const ids = (((createUserFormData as any).studentIds || []) as string[]);
+          const courseIdSet = new Set<string>();
+          for (const sid of ids) {
+            const st = students.find((s: any) => s && s.id === sid);
+            if (st?.courseId) courseIdSet.add(st.courseId);
+          }
+          const courses = LocalStorageManager.getCoursesForYear(selectedYear) || [];
+          courseNames = Array.from(courseIdSet)
+            .map((cid) => courses.find((c: any) => c.id === cid)?.name)
+            .filter(Boolean) as string[];
+        } catch {
+          courseNames = [];
+        }
       }
       
       // ✅ GARANTIZAR que siempre tengamos todos los campos mínimos necesarios
@@ -7418,6 +7485,7 @@ export default function Configuration() {
         description: `${
           createUserFormData.role === 'student' ? translate('userManagementStudent') || 'Estudiante' : 
           createUserFormData.role === 'teacher' ? translate('userManagementTeacher') || 'Profesor' : 
+          createUserFormData.role === 'guardian' ? (translate('userManagementGuardian') || 'Apoderado') :
           translate('userManagementAdministrador') || 'Administrador'
         } ${translate('userManagementCreatedSuccessfully') || 'creado exitosamente'}`,
         variant: 'default'
@@ -7435,7 +7503,7 @@ export default function Configuration() {
     setCreateUserFormData({
       name: '',
       email: '',
-  rut: '',
+      rut: '',
       role: 'student',
       username: '',
       password: '',
@@ -7444,7 +7512,10 @@ export default function Configuration() {
       courseId: '',
       section: '',
       subject: '',
-      selectedSubjects: []
+      selectedSubjects: [],
+      phone: '',
+      studentIds: [],
+      relationship: 'tutor'
     });
   };
 
@@ -7454,6 +7525,7 @@ export default function Configuration() {
   case 'admin': return 'bg-red-100 text-red-800 border border-red-300 dark:bg-red-900 dark:text-red-100 dark:border-red-700';
   case 'teacher': return 'bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-900 dark:text-blue-100 dark:border-blue-700';
   case 'student': return 'bg-green-100 text-green-800 border border-green-300 dark:bg-green-900 dark:text-green-100 dark:border-green-700';
+  case 'guardian': return 'bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-900 dark:text-purple-100 dark:border-purple-700';
   default: return 'bg-gray-100 text-gray-800 border border-gray-300 dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700';
     }
   };
@@ -7464,6 +7536,7 @@ export default function Configuration() {
       case 'admin': return <Crown className="w-3 h-3 mr-1" />;
       case 'teacher': return <Shield className="w-3 h-3 mr-1" />;
       case 'student': return <GraduationCap className="w-3 h-3 mr-1" />;
+      case 'guardian': return <Users className="w-3 h-3 mr-1" />;
       default: return null;
     }
   };
@@ -8260,6 +8333,7 @@ export default function Configuration() {
                 <div>{translate('configAdmins') || 'Admins'}: <span className="font-semibold">{excelImportSummary.admins}</span></div>
                 <div>{translate('configTeachers') || 'Teachers'}: <span className="font-semibold">{excelImportSummary.teachers}</span></div>
                 <div>{translate('configStudents') || 'Students'}: <span className="font-semibold">{excelImportSummary.students}</span></div>
+                <div>{translate('configGuardians') || 'Guardians'}: <span className="font-semibold">{excelImportSummary.guardians}</span></div>
                 <div>{translate('configErrors') || 'Errors'}: <span className={`font-semibold ${excelImportSummary.errors ? 'text-red-600' : ''}`}>{excelImportSummary.errors}</span></div>
               </div>
             )}
@@ -8282,7 +8356,7 @@ export default function Configuration() {
                 id="excel-summary-close"
                 onClick={() => setShowExcelSummaryDialog(false)}
               >
-                {translate('close') || 'Cerrar'}
+                {translate('close') || 'Close'}
               </Button>
             </div>
           </div>
@@ -8645,10 +8719,45 @@ function UserManagementSection({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<any>(null);
 
+  // Datos necesarios para el formulario de apoderados (filtrado por curso/sección + texto)
+  const [availableStudents, setAvailableStudents] = useState<any[]>([]);
+  const [studentAssignments, setStudentAssignments] = useState<any[]>([]);
+
 
   useEffect(() => {
     loadAllUsers();
   }, [refreshUsers, selectedYear]);
+
+  useEffect(() => {
+    const load = () => {
+      try {
+        setAvailableStudents(LocalStorageManager.getStudentsForYear(selectedYear) || []);
+      } catch {
+        setAvailableStudents([]);
+      }
+      try {
+        setStudentAssignments(LocalStorageManager.getStudentAssignmentsForYear(selectedYear) || []);
+      } catch {
+        setStudentAssignments([]);
+      }
+    };
+    load();
+
+    // Mantener sincronizado si cambian asignaciones/usuarios desde otras vistas
+    const handler = () => load();
+    try {
+      window.addEventListener('studentAssignmentsChanged', handler as any);
+      window.addEventListener('usersUpdated', handler as any);
+      window.addEventListener('studentsUpdated', handler as any);
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('studentAssignmentsChanged', handler as any);
+        window.removeEventListener('usersUpdated', handler as any);
+        window.removeEventListener('studentsUpdated', handler as any);
+      } catch {}
+    };
+  }, [selectedYear, refreshUsers]);
 
   // Mantener sincronizado con eventos globales de cambios de usuarios
   useEffect(() => {
@@ -8864,6 +8973,7 @@ function UserManagementSection({
       case 'admin': return translate('roleAdmin') || 'Administrador';
       case 'teacher': return translate('roleTeacher') || 'Profesor';
       case 'student': return translate('roleStudent') || 'Estudiante';
+      case 'guardian': return translate('roleGuardian') || (translate('userManagementGuardian') || 'Apoderado');
       default: return translate('user') || 'Usuario';
     }
   };
@@ -9094,6 +9204,9 @@ function UserManagementSection({
             courseId: createUserFormData.courseId,
             section: createUserFormData.section,
             selectedSubjects: createUserFormData.selectedSubjects,
+            phone: createUserFormData.phone,
+            studentIds: createUserFormData.studentIds,
+            relationship: createUserFormData.relationship,
           }}
           setForm={(updater) => {
             setCreateUserFormData((prev: typeof createUserFormData) => updater(prev as any) as any);
@@ -9104,6 +9217,8 @@ function UserManagementSection({
           availableCourses={availableCourses}
           availableSections={availableSections}
           availableSubjects={availableSubjects}
+          availableStudents={availableStudents}
+          studentAssignments={studentAssignments}
           showAutoGenerate={true}
           autoGenerateChecked={!!createUserFormData.autoGenerate}
           onToggleAutoGenerate={(checked) => setCreateUserFormData((prev: typeof createUserFormData) => ({ ...prev, autoGenerate: checked }))}
@@ -9113,6 +9228,186 @@ function UserManagementSection({
 
     {/* ✅ ELIMINADO: Card y Dialog de "Reiniciar Sistema" - Sección removida por seguridad */}
 
+    </div>
+  );
+}
+
+// Guardian Student Selector with filters (for edit form)
+function GuardianStudentSelector({
+  formData,
+  setFormData,
+  handleInputChange,
+  availableStudents,
+  availableCourses,
+  availableSections,
+  translate
+}: {
+  formData: any;
+  setFormData: (fn: (prev: any) => any) => void;
+  handleInputChange: (field: string, value: any) => void;
+  availableStudents: any[];
+  availableCourses: any[];
+  availableSections: any[];
+  translate: (key: string) => string;
+}) {
+  const [filterCourseId, setFilterCourseId] = useState('');
+  const [filterSectionId, setFilterSectionId] = useState('');
+
+  // Filter sections based on selected course
+  const sectionsForFilter = filterCourseId && filterCourseId !== 'all'
+    ? availableSections.filter((s: any) => s.courseId === filterCourseId)
+    : availableSections;
+
+  // Filter students
+  const assignedIds = formData.studentIds || [];
+  const filteredStudents = availableStudents.filter((student: any) => {
+    // Filter by course
+    if (filterCourseId && filterCourseId !== 'all') {
+      if (filterCourseId === 'unassigned') {
+        if (student.courseId) return false;
+      } else {
+        if (student.courseId !== filterCourseId) return false;
+      }
+    }
+    // Filter by section
+    if (filterSectionId && filterSectionId !== 'all' && student.sectionId !== filterSectionId) return false;
+    return true;
+  });
+
+  // Sort: assigned first, then unassigned
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    const aAssigned = assignedIds.includes(a.id) ? 0 : 1;
+    const bAssigned = assignedIds.includes(b.id) ? 0 : 1;
+    if (aAssigned !== bAssigned) return aAssigned - bAssigned;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  const toggleStudent = (studentId: string) => {
+    setFormData((prev: any) => {
+      const ids = prev.studentIds || [];
+      if (ids.includes(studentId)) return { ...prev, studentIds: ids.filter((id: string) => id !== studentId) };
+      return { ...prev, studentIds: [...ids, studentId] };
+    });
+  };
+
+  return (
+    <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg">
+      <div>
+        <Label htmlFor="phone">{translate('userManagementPhone') || 'Teléfono'}</Label>
+        <Input id="phone" type="tel" inputMode="tel" value={formData.phone || ''} onChange={(e) => handleInputChange('phone', e.target.value)} placeholder={translate('userManagementPhonePlaceholder') || '+56 9 1234 5678'} />
+      </div>
+      <div>
+        <Label htmlFor="relationship">{translate('userManagementRelationship') || 'Parentesco'}</Label>
+        <Select value={formData.relationship || 'tutor'} onValueChange={(v) => handleInputChange('relationship', v as any)}>
+          <SelectTrigger>
+            <SelectValue placeholder={translate('userManagementSelectRelationship') || 'Selecciona parentesco'} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mother">{translate('relationshipMother') || 'Madre'}</SelectItem>
+            <SelectItem value="father">{translate('relationshipFather') || 'Padre'}</SelectItem>
+            <SelectItem value="tutor">{translate('relationshipTutor') || 'Tutor'}</SelectItem>
+            <SelectItem value="other">{translate('relationshipOther') || 'Otro'}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>{translate('userManagementStudentsInCharge') || 'Estudiantes a cargo'}</Label>
+        <p className="text-xs text-muted-foreground mb-2">
+          {translate('userManagementSelectStudentsForGuardian') || 'Selecciona los estudiantes que están a cargo de este apoderado'}
+        </p>
+
+        {/* Selected students as badges */}
+        {assignedIds.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {assignedIds.map((sid: string) => {
+              const st = availableStudents.find((s: any) => s.id === sid);
+              if (!st) return null;
+              const courseName = availableCourses.find((c: any) => c.id === st.courseId)?.name || '';
+              const sectionName = availableSections.find((sec: any) => sec.id === st.sectionId)?.name || '';
+              return (
+                <Badge key={sid} className="bg-purple-600 text-white flex items-center gap-1 pr-1">
+                  {st.name} {courseName && <span className="text-purple-200 text-xs">({courseName}{sectionName ? ` - ${sectionName}` : ''})</span>}
+                  <button
+                    type="button"
+                    onClick={() => toggleStudent(sid)}
+                    className="ml-1 hover:bg-purple-700 rounded-full p-0.5"
+                    title={translate('remove') || 'Eliminar'}
+                  >
+                    <span className="sr-only">{translate('remove') || 'Eliminar'}</span>
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </Badge>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Filters (course/section only, no search) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+          <Select value={filterCourseId || 'all'} onValueChange={(v) => { setFilterCourseId(v === 'all' ? '' : v); setFilterSectionId(''); }}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder={translate('userManagementAllCourses') || 'Todos los cursos'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{translate('userManagementAllCourses') || 'Todos los cursos'}</SelectItem>
+              <SelectItem value="unassigned">{translate('userManagementNoAssignedCourse') || 'Sin curso asignado'}</SelectItem>
+              {availableCourses.map((c: any) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterSectionId || 'all'} onValueChange={(v) => setFilterSectionId(v === 'all' ? '' : v)} disabled={!filterCourseId || filterCourseId === 'unassigned'}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder={translate('userManagementAllSections') || 'Todas las secciones'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{translate('userManagementAllSections') || 'Todas las secciones'}</SelectItem>
+              {sectionsForFilter.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Student list */}
+        <div className="mt-2 max-h-56 overflow-y-auto space-y-1 border rounded p-2 bg-background">
+          {sortedStudents.length === 0 && (
+            <div className="text-sm text-muted-foreground py-2 text-center">
+              {availableStudents.length === 0
+                ? (translate('userManagementNoStudents') || 'No hay estudiantes registrados en el sistema')
+                : (translate('noStudentsMatchFilter') || 'No hay estudiantes que coincidan con los filtros')}
+            </div>
+          )}
+          {sortedStudents.map((s: any) => {
+            const isAssigned = assignedIds.includes(s.id);
+            const courseName = availableCourses.find((c: any) => c.id === s.courseId)?.name || '';
+            const sectionName = availableSections.find((sec: any) => sec.id === s.sectionId)?.name || '';
+            return (
+              <div
+                key={s.id}
+                className={`flex items-center space-x-2 p-1.5 rounded cursor-pointer transition-colors ${isAssigned ? 'bg-purple-100 dark:bg-purple-900' : 'hover:bg-muted'}`}
+                onClick={() => toggleStudent(s.id)}
+              >
+                <input
+                  type="checkbox"
+                  id={`gs-${s.id}`}
+                  checked={isAssigned}
+                  onChange={() => toggleStudent(s.id)}
+                  className="rounded"
+                />
+                <Label htmlFor={`gs-${s.id}`} className="text-sm cursor-pointer flex-1">
+                  {s.name} <span className="text-muted-foreground">@{s.username}</span>
+                  {courseName && <span className="ml-1 text-xs text-muted-foreground">({courseName}{sectionName ? ` - ${sectionName}` : ''})</span>}
+                </Label>
+              </div>
+            );
+          })}
+        </div>
+        {assignedIds.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">{assignedIds.length} {assignedIds.length === 1 ? (translate('studentSelected') || 'estudiante seleccionado') : (translate('studentsSelectedPlural') || 'estudiantes seleccionados')}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -9137,7 +9432,12 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
     isActive: user?.isActive !== undefined ? user.isActive : true,
     selectedSubjects: user?.selectedSubjects || [],
     courseId: user?.courseId || '',
-    sectionId: user?.sectionId || ''
+    sectionId: user?.sectionId || '',
+    // Teacher/student/guardian editable fields
+    assignedSections: user?.assignedSections || [],
+    phone: user?.phone || '',
+    studentIds: user?.studentIds || [],
+    relationship: user?.relationship || 'tutor'
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -9166,6 +9466,12 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
     }
   });
 
+  // Students for guardian editing
+  const [availableStudents] = useState(() => {
+    try { return LocalStorageManager.getStudentsForYear(selectedYear); } catch { return []; }
+  });
+  
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -9176,8 +9482,12 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
         confirmPassword: '',
         isActive: user.isActive !== undefined ? user.isActive : true,
         selectedSubjects: user.selectedSubjects || [],
-        courseId: user.courseId || '',
-        sectionId: user.sectionId || ''
+        courseId: (user as any).courseId || '',
+        sectionId: (user as any).sectionId || '',
+        assignedSections: (user as any).assignedSections || [],
+        phone: (user as any).phone || '',
+        studentIds: (user as any).studentIds || [],
+        relationship: (user as any).relationship || 'tutor'
       });
     }
   }, [user]);
@@ -9246,11 +9556,43 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
                 username: formData.username,
                 email: formData.email,
                 isActive: formData.isActive,
-                selectedSubjects: formData.selectedSubjects
+                selectedSubjects: formData.selectedSubjects,
+                assignedSections: formData.assignedSections || []
               }
             : t
         );
         LocalStorageManager.setTeachersForYear(selectedYear, updatedTeachers);
+      } else if (user.type === 'guardian') {
+        const guardians = LocalStorageManager.getGuardiansForYear(selectedYear);
+        const updatedGuardians = guardians.map((g: any) =>
+          g.id === user.id
+            ? {
+                ...g,
+                name: formData.name,
+                username: formData.username,
+                email: formData.email,
+                isActive: formData.isActive,
+                phone: formData.phone || '',
+                studentIds: formData.studentIds || [],
+                relationship: formData.relationship || 'tutor'
+              }
+            : g
+        );
+        LocalStorageManager.setGuardiansForYear(selectedYear, updatedGuardians);
+
+        // Update guardian-student relations: remove existing for this guardian and add new ones
+        const existingRelations = LocalStorageManager.getGuardianStudentRelationsForYear(selectedYear) || [];
+        const filtered = existingRelations.filter((r: any) => r.guardianId !== user.id);
+        const newRelations = (formData.studentIds || []).map((studentId: string, index: number) => ({
+          id: `gsr-${user.id}-${studentId}-${Date.now()}-${index}`,
+          guardianId: user.id,
+          studentId,
+          relationship: formData.relationship || 'tutor',
+          isPrimary: index === 0,
+          createdAt: new Date()
+        }));
+        LocalStorageManager.setGuardianStudentRelationsForYear(selectedYear, [...filtered, ...newRelations]);
+        try { window.dispatchEvent(new CustomEvent('guardiansUpdated', { detail: { action: 'update' } })); } catch {}
       }
 
       // Update in main users if password changed
@@ -9274,6 +9616,9 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
         window.dispatchEvent(new CustomEvent('usersUpdated', { detail: { action: 'update', userType: user.type, source: 'admin-config' } }));
         if (user.type === 'student') {
           window.dispatchEvent(new CustomEvent('studentAssignmentsChanged', { detail: { action: 'update' } }));
+        }
+        if (user.type === 'guardian') {
+          try { window.dispatchEvent(new CustomEvent('guardiansUpdated', { detail: { action: 'update' } })); } catch {}
         }
       } catch {}
 
@@ -9342,7 +9687,8 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
               <Badge className={getRoleColor(user.type)}>
                 {getRoleIcon(user.type)}
                 {user.type === 'admin' ? (translate('editUserTypeAdmin') || 'Administrador') :
-                 user.type === 'teacher' ? (translate('editUserTypeTeacher') || 'Profesor') : 
+                 user.type === 'teacher' ? (translate('editUserTypeTeacher') || 'Profesor') :
+                 user.type === 'guardian' ? (translate('editUserTypeGuardian') || translate('userManagementGuardian') || 'Apoderado') :
                  (translate('editUserTypeStudent') || 'Estudiante')}
               </Badge>
             </div>
@@ -9471,7 +9817,47 @@ function EditUserForm({ user, onClose, onUserUpdated, getRoleColor, getRoleIcon,
               </div>
             ))}
           </div>
+
+          {/* Assigned sections for teacher */}
+          <div className="space-y-2">
+            <Label>{translate('editUserAssignedSections') || 'Secciones asignadas'}</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+              {availableSections.map((section: any) => {
+                const course = availableCourses.find((c: any) => c.id === section.courseId);
+                const checked = (formData.assignedSections || []).includes(section.id);
+                return (
+                  <div key={section.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`as-${section.id}`}
+                      checked={checked}
+                      onChange={() => {
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          assignedSections: checked ? (prev.assignedSections || []).filter((s: string) => s !== section.id) : [...(prev.assignedSections || []), section.id]
+                        }));
+                      }}
+                    />
+                    <Label htmlFor={`as-${section.id}`} className="text-sm">{course?.name || 'Curso'} — {section.name}</Label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Guardian-specific fields */}
+      {user.type === 'guardian' && (
+        <GuardianStudentSelector
+          formData={formData}
+          setFormData={setFormData}
+          handleInputChange={handleInputChange}
+          availableStudents={availableStudents}
+          availableCourses={availableCourses}
+          availableSections={availableSections}
+          translate={translate}
+        />
       )}
 
       {/* Action buttons */}
