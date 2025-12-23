@@ -223,6 +223,10 @@ export default function GradesPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [studentAssignments, setStudentAssignments] = useState<any[]>([]);
   const [pendingTasks, setPendingTasks] = useState<PendingTask[]>([]);
+  
+  // 🎓 APODERADO: Estudiantes asignados al guardian
+  const [guardianStudents, setGuardianStudents] = useState<any[]>([]);
+  const [selectedGuardianStudent, setSelectedGuardianStudent] = useState<string | null>(null);
   // Timeline completo (todas las tareas/evaluaciones/pruebas relevantes para mostrar burbujas N1..N10, no solo pendientes)
   const [timelineTasks, setTimelineTasks] = useState<PendingTask[]>([]);
   // Actividades SQL (cuando hay conexión)
@@ -1390,6 +1394,7 @@ export default function GradesPage() {
           setComboSectionId('all');
           setSubjectFilter('all');
           setStudentFilter('all');
+          setSelectedGuardianStudent(null); // Reset estudiante del apoderado
           setSemester('all');
           setSelectedYear(y);
           try {
@@ -1974,6 +1979,28 @@ export default function GradesPage() {
           console.log(`✅ [Optimized Query - Estudiante] Filtradas ${filteredGrades.length} de ${optimizedGrades.length} calificaciones`);
         }
         
+        // 🎓 FILTRO PARA APODERADOS: Solo mostrar calificaciones del estudiante seleccionado
+        if (user?.role === 'guardian' && selectedGuardianStudent) {
+          console.log(`👨‍👩‍👧 [Optimized Query - Apoderado] Filtrando calificaciones para estudiante: ${selectedGuardianStudent}`);
+          
+          // Buscar el estudiante seleccionado para obtener sus identificadores
+          const selectedStudent = guardianStudents.find(s => String(s.id) === String(selectedGuardianStudent));
+          const studentIds = selectedStudent ? [
+            selectedStudent.id,
+            selectedStudent.rut,
+            selectedStudent.username
+          ].filter(Boolean) : [selectedGuardianStudent];
+          
+          filteredGrades = optimizedGrades.filter((g: any) => {
+            const matchId = studentIds.includes(String(g.studentId));
+            const matchUsername = selectedStudent?.username && String(g.studentUsername) === selectedStudent.username;
+            const matchName = selectedStudent?.displayName && String(g.studentName || '').toLowerCase().includes((selectedStudent.displayName || '').toLowerCase());
+            return matchId || matchUsername || matchName;
+          });
+          
+          console.log(`✅ [Optimized Query - Apoderado] Filtradas ${filteredGrades.length} de ${optimizedGrades.length} calificaciones`);
+        }
+        
         // Convertir formato si es necesario
         const formatted = filteredGrades.map(g => ({
           ...g,
@@ -2007,13 +2034,164 @@ export default function GradesPage() {
         setIsSyncing(false);
       });
       
-  }, [useOptimizedQuery, comboSectionId, cascadeSectionId, subjectFilter, cascadeSubject, selectedYear, sections, getGradesByCourseAndSection, isSQLConnected, user]);
+  }, [useOptimizedQuery, comboSectionId, cascadeSectionId, subjectFilter, cascadeSubject, selectedYear, sections, getGradesByCourseAndSection, isSQLConnected, user, selectedGuardianStudent, guardianStudents]);
 
   // Resetear la bandera de carga inicial cuando cambie el año
   useEffect(() => {
     initialLoadDoneRef.current = false;
     console.log(`🔄 Año cambiado a ${selectedYear}, reseteando bandera de carga inicial`);
   }, [selectedYear]);
+
+  // 🎓 APODERADO: Cargar estudiantes asignados
+  useEffect(() => {
+    if (!user || user.role !== 'guardian') {
+      setGuardianStudents([]);
+      setSelectedGuardianStudent(null);
+      return;
+    }
+    
+    console.log(`👨‍👩‍👧 [Guardian] Cargando estudiantes asignados para: ${user.username}`);
+    
+    let assignedStudentIds: string[] = [];
+    
+    // Prioridad 1: Buscar en smart-student-guardians-{year} (datos de carga masiva)
+    const guardiansForYear = loadJson<any[]>(`smart-student-guardians-${selectedYear}`, []);
+    const guardianFromYear = guardiansForYear.find((g: any) => 
+      g.username?.toLowerCase() === user.username?.toLowerCase() ||
+      g.id === (user as any).id
+    );
+    
+    if (guardianFromYear?.studentIds && guardianFromYear.studentIds.length > 0) {
+      assignedStudentIds = guardianFromYear.studentIds;
+      console.log(`👨‍👩‍👧 [Guardian] studentIds desde guardiansForYear:`, assignedStudentIds);
+    }
+    
+    // Prioridad 2: Buscar en smart-student-guardian-student-relations-{year}
+    if (assignedStudentIds.length === 0) {
+      let guardianRelations = loadJson<any[]>(`smart-student-guardian-student-relations-${selectedYear}`, []);
+      if (guardianRelations.length === 0) {
+        guardianRelations = loadJson<any[]>('smart-student-guardian-student-relations', []);
+      }
+      
+      assignedStudentIds = guardianRelations
+        .filter((rel: any) => rel.guardianId === (user as any).id || rel.guardianUsername === user.username)
+        .map((rel: any) => rel.studentId);
+      
+      if (assignedStudentIds.length > 0) {
+        console.log(`👨‍👩‍👧 [Guardian] studentIds desde relations:`, assignedStudentIds);
+      }
+    }
+    
+    // Prioridad 3: Buscar en smart-student-users (fullUserData.studentIds)
+    if (assignedStudentIds.length === 0) {
+      const usersData = loadJson<any[]>('smart-student-users', []);
+      const fullUserData = usersData.find((u: any) => 
+        u.username?.toLowerCase() === user.username?.toLowerCase()
+      );
+      if (fullUserData?.studentIds && fullUserData.studentIds.length > 0) {
+        assignedStudentIds = fullUserData.studentIds;
+        console.log(`👨‍👩‍👧 [Guardian] studentIds desde smart-student-users:`, assignedStudentIds);
+      }
+    }
+    
+    // Buscar los objetos de estudiante completos
+    const allStudents = users.filter(u => u?.role === 'student' || u?.role === 'estudiante');
+    const myStudents = allStudents.filter(student => {
+      const sid = String(student.id || '');
+      const susername = String(student.username || '');
+      const srut = String(student.rut || '');
+      return assignedStudentIds.some(aid => 
+        String(aid) === sid || 
+        String(aid) === susername || 
+        String(aid) === srut
+      );
+    });
+    
+    console.log(`👨‍👩‍👧 [Guardian] Estudiantes encontrados: ${myStudents.length}`, myStudents.map(s => s.displayName || s.name));
+    setGuardianStudents(myStudents);
+    
+    // Si solo hay un estudiante, seleccionarlo automáticamente
+    if (myStudents.length === 1 && !selectedGuardianStudent) {
+      setSelectedGuardianStudent(String(myStudents[0].id));
+    }
+  }, [user, selectedYear, users]);
+
+  // 🎓 APODERADO: Auto-configurar filtros cuando se selecciona un estudiante
+  useEffect(() => {
+    if (!user || user.role !== 'guardian' || !selectedGuardianStudent) {
+      return;
+    }
+    
+    // Helper local para determinar nivel del curso
+    const getCourseLevelLocal = (name?: string): 'basica' | 'media' | null => {
+      if (!name) return null;
+      const n = name.trim().toLowerCase();
+      if (n.includes('básica') || n.includes('basico') || n.includes('básico') || n.includes('basica')) return 'basica';
+      if (n.includes('medio') || n.includes('media')) return 'media';
+      const match = n.match(/^(\d{1,2})/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= 1 && num <= 8) return 'basica';
+        if (num >= 9 && num <= 12) return 'media';
+      }
+      return null;
+    };
+    
+    // Buscar el estudiante seleccionado
+    const student = guardianStudents.find(s => String(s.id) === String(selectedGuardianStudent));
+    if (!student) return;
+    
+    console.log(`👨‍👩‍👧 [Guardian] Configurando filtros para estudiante:`, student.displayName || student.name);
+    
+    // Buscar la asignación del estudiante
+    const studentAssign = studentAssignments.find(a => 
+      String(a.studentId) === String(student.id) || 
+      String(a.studentUsername) === String(student.username)
+    );
+    
+    if (!studentAssign) {
+      console.warn(`⚠️ [Guardian] No se encontró asignación para el estudiante ${student.id}`);
+      return;
+    }
+    
+    console.log(`👨‍👩‍👧 [Guardian] Asignación encontrada:`, studentAssign);
+    
+    // Obtener sección y curso
+    const studentSection = sections.find(s => String(s.id) === String(studentAssign.sectionId));
+    if (!studentSection) {
+      console.warn(`⚠️ [Guardian] No se encontró sección ${studentAssign.sectionId}`);
+      return;
+    }
+    
+    const studentCourse = courses.find(c => String(c.id) === String(studentSection.courseId));
+    if (!studentCourse) {
+      console.warn(`⚠️ [Guardian] No se encontró curso ${studentSection.courseId}`);
+      return;
+    }
+    
+    // Determinar nivel
+    const level = getCourseLevelLocal(studentCourse.name);
+    console.log(`👨‍👩‍👧 [Guardian] Auto-configurando: Nivel=${level}, Curso=${studentCourse.name}, Sección=${studentSection.name}`);
+    
+    // Configurar filtros automáticamente
+    if (level) setLevelFilter(level);
+    setCascadeCourseId(studentCourse.id);
+    setCascadeSectionId(studentSection.id);
+    setComboSectionId(studentSection.id);
+    setStudentFilter(String(student.id));
+    // No seleccionar asignatura para mostrar todas
+    setCascadeSubject(null);
+    setSubjectFilter('all');
+    
+    // 🎓 Auto-seleccionar el semestre actual para que el apoderado vea las calificaciones de inmediato
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    // Primer semestre: marzo-julio (meses 3-7), Segundo semestre: agosto-diciembre (meses 8-12)
+    const autoSem = currentMonth >= 8 ? '2' : '1';
+    console.log(`👨‍👩‍👧 [Guardian] Auto-seleccionando semestre ${autoSem} (mes actual: ${currentMonth})`);
+    setSemester(autoSem);
+    
+  }, [selectedGuardianStudent, guardianStudents, studentAssignments, sections, courses, user]);
 
   // Semestre por defecto: al entrar y solo una vez (para el año actual)
   useEffect(() => {
@@ -3259,6 +3437,29 @@ export default function GradesPage() {
       } catch {}
       return { courses: c, sections: s, subjects: subj };
     }
+    
+    // 🎓 APODERADO: Permisos basados en estudiantes asignados
+    if (user.role === 'guardian') {
+      const c = new Set<string>();
+      const s = new Set<string>();
+      
+      // Obtener secciones de los estudiantes asignados
+      guardianStudents.forEach(student => {
+        const assign = studentAssignments.find(a => 
+          String(a.studentId) === String(student.id) || 
+          String(a.studentUsername) === String(student.username)
+        );
+        if (assign) {
+          if (assign.courseId) c.add(String(assign.courseId));
+          if (assign.sectionId) s.add(String(assign.sectionId));
+        }
+      });
+      
+      console.log(`👨‍👩‍👧 [allowed] Permisos guardian - Cursos: ${c.size}, Secciones: ${s.size}`);
+      
+      return { courses: c, sections: s, subjects: new Set<string>() };
+    }
+    
     // Estudiante
     console.log(`🔍 [allowed] Filtrando assignments para estudiante:`, {
       userId: (user as any).id,
@@ -3307,7 +3508,7 @@ export default function GradesPage() {
     console.log(`🔍 [allowed] Secciones permitidas para estudiante: ${s.size}`, Array.from(s));
     
     return { courses: c, sections: s, subjects: new Set<string>() };
-  }, [user, courses, sections, subjects, teacherAssignments, studentAssignments]);
+  }, [user, courses, sections, subjects, teacherAssignments, studentAssignments, guardianStudents]);
 
   // Derivar chips de filtros según rol y nivel
   const courseSectionOptions: Option[] = useMemo(() => {
@@ -3557,6 +3758,25 @@ export default function GradesPage() {
     const set = new Set<'basica' | 'media'>();
     try {
       if (user?.role === 'admin') { set.add('basica'); set.add('media'); return set; }
+      
+      // 🎓 APODERADO: Niveles según secciones de sus estudiantes
+      if (user?.role === 'guardian') {
+        guardianStudents.forEach(student => {
+          const assign = studentAssignments.find(a => 
+            String(a.studentId) === String(student.id) || 
+            String(a.studentUsername) === String(student.username)
+          );
+          if (assign?.sectionId) {
+            const sec = sections.find(s => String(s.id) === String(assign.sectionId));
+            const crs = sec ? courseById.get(String(sec.courseId)) : undefined;
+            const lvl = getCourseLevel(crs?.name || undefined);
+            if (lvl) set.add(lvl);
+          }
+        });
+        if (set.size === 0) { set.add('basica'); set.add('media'); }
+        return set;
+      }
+      
       // 1) Derivar por secciones explícitamente permitidas (aplica a profesor y estudiante)
       sections.forEach(sec => {
         if (!allowed.sections.has(String(sec.id))) return;
@@ -3587,7 +3807,7 @@ export default function GradesPage() {
       if (set.size === 0) { set.add('basica'); set.add('media'); }
     } catch { set.add('basica'); set.add('media'); }
     return set;
-  }, [user, allowed.sections, sections, courseById, teacherAssignments]);
+  }, [user, allowed.sections, sections, courseById, teacherAssignments, guardianStudents, studentAssignments]);
 
   // Pre-filtro de nivel para profesor: si solo tiene un nivel (básica o media), fijarlo automáticamente
   useEffect(() => {
@@ -5611,6 +5831,7 @@ export default function GradesPage() {
                         setComboSectionId('all');
                         setSubjectFilter('all');
                         setStudentFilter('all');
+                        setSelectedGuardianStudent(null);
                         setSemester('all');
                         setSelectedYear(y);
                         window.dispatchEvent(new StorageEvent('storage', { key: 'admin-selected-year', newValue: String(y) }));
@@ -5642,6 +5863,7 @@ export default function GradesPage() {
                               setComboSectionId('all');
                               setSubjectFilter('all');
                               setStudentFilter('all');
+                              setSelectedGuardianStudent(null);
                               setSemester('all');
                               setSelectedYear(y);
                               window.dispatchEvent(new StorageEvent('storage', { key: 'admin-selected-year', newValue: String(y) }));
@@ -5667,6 +5889,7 @@ export default function GradesPage() {
                         setComboSectionId('all');
                         setSubjectFilter('all');
                         setStudentFilter('all');
+                        setSelectedGuardianStudent(null);
                         setSemester('all');
                         setSelectedYear(y);
                         window.dispatchEvent(new StorageEvent('storage', { key: 'admin-selected-year', newValue: String(y) }));
@@ -5682,26 +5905,86 @@ export default function GradesPage() {
               {/* Vista en cascada y filtros */}
               {/* Vista en cascada: Nivel → Curso → Sección → Asignatura → Estudiantes */}
               <div className="space-y-4">
-                {/* Niveles */}
+                
+                {/* 🎓 APODERADO: Selector de estudiante asignado */}
+                {user?.role === 'guardian' && guardianStudents.length > 0 && (
+                  <div className="mb-4">
+                    <div className="text-xs text-muted-foreground mb-2">{tr('selectStudent', 'Seleccionar Estudiante')}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {guardianStudents.map(student => {
+                        const isSelected = selectedGuardianStudent === String(student.id);
+                        const studentAssign = studentAssignments.find(a => 
+                          String(a.studentId) === String(student.id) || 
+                          String(a.studentUsername) === String(student.username)
+                        );
+                        const studentSection = studentAssign ? sections.find(s => String(s.id) === String(studentAssign.sectionId)) : null;
+                        const studentCourse = studentSection ? courses.find(c => String(c.id) === String(studentSection.courseId)) : null;
+                        const courseLabel = studentCourse && studentSection ? `${studentCourse.name} ${studentSection.name}` : '';
+                        
+                        return (
+                          <button
+                            key={String(student.id)}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                // Deseleccionar: limpiar filtros
+                                setSelectedGuardianStudent(null);
+                                setLevelFilter('all');
+                                setCascadeCourseId(null);
+                                setCascadeSectionId(null);
+                                setComboSectionId('all');
+                                setStudentFilter('all');
+                              } else {
+                                // Seleccionar estudiante
+                                setSelectedGuardianStudent(String(student.id));
+                              }
+                            }}
+                            className={`inline-flex flex-col items-start rounded-lg px-4 py-2 text-sm border transition ${
+                              isSelected 
+                                ? 'bg-indigo-600 border-indigo-600 text-white' 
+                                : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-200'
+                            }`}
+                          >
+                            <span className="font-medium">{student.displayName || student.name || student.username}</span>
+                            {courseLabel && (
+                              <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-indigo-500 dark:text-indigo-400'}`}>
+                                {courseLabel}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!selectedGuardianStudent && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                        👆 {tr('selectStudentToViewGrades', 'Seleccione un estudiante para ver sus calificaciones')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Niveles - Ocultar completamente para apoderados */}
+                {user?.role !== 'guardian' && (
                 <div>
                   <div className="text-xs text-muted-foreground mb-2">{tr('levels', 'Niveles')}</div>
                   <div className="flex items-center gap-2">
                     {(() => {
-                      const canShowBasica = teacherLevelsAllowed.has('basica') || user?.role === 'admin';
-                      const canShowMedia = teacherLevelsAllowed.has('media') || user?.role === 'admin';
+                      const canShowBasica = teacherLevelsAllowed.has('basica') || user?.role === 'admin' || user?.role === 'guardian';
+                      const canShowMedia = teacherLevelsAllowed.has('media') || user?.role === 'admin' || user?.role === 'guardian';
                       const isStudent = user?.role === 'student';
+                      const isGuardian = user?.role === 'guardian';
                       return (
                         <>
                           {canShowBasica && (
                             <Badge
-                              onClick={() => { if (isStudent) return; const next = levelFilter === 'basica' ? 'all' : 'basica'; setLevelFilter(next); setCascadeCourseId(null); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
-                              className={`cursor-pointer select-none rounded-full px-3 py-1 ${levelFilter === 'basica' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-600'}`}
+                              onClick={() => { if (isStudent || isGuardian) return; const next = levelFilter === 'basica' ? 'all' : 'basica'; setLevelFilter(next); setCascadeCourseId(null); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
+                              className={`${isGuardian ? 'cursor-default' : 'cursor-pointer'} select-none rounded-full px-3 py-1 ${levelFilter === 'basica' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-600'}`}
                             >{tr('basicLevel', 'Básica')}</Badge>
                           )}
                           {canShowMedia && (!isStudent) && (
                             <Badge
-                              onClick={() => { const next = levelFilter === 'media' ? 'all' : 'media'; setLevelFilter(next); setCascadeCourseId(null); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
-                              className={`cursor-pointer select-none rounded-full px-3 py-1 ${levelFilter === 'media' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-600'}`}
+                              onClick={() => { if (isGuardian) return; const next = levelFilter === 'media' ? 'all' : 'media'; setLevelFilter(next); setCascadeCourseId(null); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
+                              className={`${isGuardian ? 'cursor-default' : 'cursor-pointer'} select-none rounded-full px-3 py-1 ${levelFilter === 'media' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-600'}`}
                             >{tr('middleLevel', 'Media')}</Badge>
                           )}
                         </>
@@ -5709,9 +5992,10 @@ export default function GradesPage() {
                     })()}
                   </div>
                 </div>
+                )}
 
-                {/* Cursos del nivel seleccionado */}
-                {levelFilter !== 'all' && (
+                {/* Cursos del nivel seleccionado - Ocultar para apoderados */}
+                {levelFilter !== 'all' && user?.role !== 'guardian' && (
                   <div>
                     <div className="text-xs text-muted-foreground mb-2">{tr('courses', 'Cursos')}</div>
                     <div className="flex flex-wrap gap-2">
@@ -5728,6 +6012,10 @@ export default function GradesPage() {
                             if (!myAssign) return false;
                             const mySection = sections.find(s => String(s.id) === String(myAssign.sectionId));
                             return String(mySection?.courseId) === String(c.id);
+                          }
+                          if (user?.role === 'guardian') {
+                            // Solo los cursos de los estudiantes asignados
+                            return allowed.courses.has(String(c.id));
                           }
                           return true;
                         })
@@ -5754,10 +6042,11 @@ export default function GradesPage() {
                             <button
                               key={c.id}
                               type="button"
-                              onClick={() => { const isSelected = cascadeCourseId === c.id; setCascadeCourseId(isSelected ? null : c.id); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
+                              disabled={user?.role === 'guardian'}
+                              onClick={() => { if (user?.role === 'guardian') return; const isSelected = cascadeCourseId === c.id; setCascadeCourseId(isSelected ? null : c.id); setCascadeSectionId(null); setCascadeSubject(null); setComboSectionId('all'); setSubjectFilter('all'); setStudentFilter('all'); }}
                               className={`inline-flex items-center rounded-full px-3 py-1 text-xs border transition ${
                                 cascadeCourseId === c.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-200'
-                              }`}
+                              } ${user?.role === 'guardian' ? 'cursor-default' : ''}`}
                               title={`${studentCount} estudiante(s)`}
                             >{c.name} <span className="ml-2 opacity-80">({studentCount})</span></button>
                           );
@@ -5766,8 +6055,8 @@ export default function GradesPage() {
                   </div>
                 )}
 
-                {/* Secciones: visibles con curso seleccionado o solo nivel */}
-                {(cascadeCourseId || levelFilter !== 'all') && (
+                {/* Secciones: visibles con curso seleccionado o solo nivel - Ocultar para apoderados */}
+                {(cascadeCourseId || levelFilter !== 'all') && user?.role !== 'guardian' && (
                   <div>
                     <div className="text-xs text-muted-foreground mb-2">{tr('sections', 'Secciones')}</div>
                     <div className="flex flex-wrap gap-2">
@@ -5785,6 +6074,9 @@ export default function GradesPage() {
                           // Solo su sección
                           const myAssign = studentAssignments.find(a => String(a.studentId) === String((user as any).id) || String(a.studentUsername) === String(user?.username));
                           list = myAssign ? list.filter(s => String(s.id) === String(myAssign.sectionId)) : [];
+                        } else if (user?.role === 'guardian') {
+                          // Solo las secciones de los estudiantes asignados
+                          list = list.filter(s => allowed.sections.has(String(s.id)));
                         }
                         list.sort((a, b) => {
                           const ca = courseById.get(a.courseId)?.name || '';
@@ -5811,10 +6103,11 @@ export default function GradesPage() {
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => { const isSelected = cascadeSectionId === s.id; setCascadeSectionId(isSelected ? null : s.id); setCascadeSubject(null); setComboSectionId(isSelected ? 'all' : String(s.id)); setSubjectFilter('all'); setStudentFilter('all'); }}
+                            disabled={user?.role === 'guardian'}
+                            onClick={() => { if (user?.role === 'guardian') return; const isSelected = cascadeSectionId === s.id; setCascadeSectionId(isSelected ? null : s.id); setCascadeSubject(null); setComboSectionId(isSelected ? 'all' : String(s.id)); setSubjectFilter('all'); setStudentFilter('all'); }}
                             className={`inline-flex items-center rounded-full px-3 py-1 text-xs border transition ${
                               cascadeSectionId === s.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500 dark:text-indigo-200'
-                            }`}
+                            } ${user?.role === 'guardian' ? 'cursor-default' : ''}`}
                             title={`${studentCount} estudiante(s)`}
                           >{label} <span className="ml-2 opacity-80">({studentCount})</span></button>
                         );
@@ -5941,7 +6234,8 @@ export default function GradesPage() {
 
                 {(() => { // mostrar estudiantes cuando hay una sección seleccionada
                   const basicFiltersReady = !!cascadeSectionId;
-                  if (!(basicFiltersReady && user?.role !== 'student')) return null;
+                  // No mostrar para estudiantes ni para apoderados (ellos ya tienen selector propio)
+                  if (!(basicFiltersReady && user?.role !== 'student' && user?.role !== 'guardian')) return null;
                   return (
                   <div>
                     <div className="text-xs text-muted-foreground mb-2">{tr('students', 'Estudiantes')}</div>
@@ -6002,12 +6296,30 @@ export default function GradesPage() {
 
         {/* Resultados: un cuadro (Card) separado por cada asignatura - permanecen en columna izquierda */}
         {(() => {
-          // 🔥 CAMBIO: Requiere nivel + curso + sección + semestre + ASIGNATURA para mostrar tabla
-          // Esto evita cargar todos los datos y mejora rendimiento con 43,200+ registros
-          const hasSubjectSelected = (subjectFilter && subjectFilter !== 'all') || (cascadeSubject && cascadeSubject !== '');
-          const minimalReady = !!cascadeSectionId && (semester === '1' || semester === '2') && hasSubjectSelected;
+          // 🎓 APODERADO: Mostrar todas las asignaturas cuando hay estudiante seleccionado
+          const isGuardianWithStudent = user?.role === 'guardian' && selectedGuardianStudent;
           
-          if (!cascadeSectionId || semester === 'all') {
+          // 🎓 ESTUDIANTE: Mostrar todas las asignaturas automáticamente
+          const isStudentRole = user?.role === 'student' || user?.role === 'estudiante';
+          
+          // 🔥 CAMBIO: Requiere nivel + curso + sección + semestre + ASIGNATURA para mostrar tabla
+          // Excepto para apoderados y estudiantes que ven todas las asignaturas automáticamente
+          const hasSubjectSelected = (subjectFilter && subjectFilter !== 'all') || (cascadeSubject && cascadeSubject !== '') || isGuardianWithStudent || isStudentRole;
+          
+          // 🎓 APODERADO: No requiere semestre específico, puede ver "all" (ambos semestres)
+          const semesterReady = (semester === '1' || semester === '2') || isGuardianWithStudent;
+          const minimalReady = !!cascadeSectionId && semesterReady && hasSubjectSelected;
+          
+          if (!cascadeSectionId || (!semesterReady)) {
+            // Mensaje especial para apoderados sin estudiante seleccionado
+            if (user?.role === 'guardian' && !selectedGuardianStudent) {
+              return <Card className="mt-4"><CardContent><div className="text-muted-foreground text-sm py-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">👨‍👩‍👧</span>
+                  <span>{tr('selectStudentFirst', 'Seleccione un estudiante para ver sus calificaciones')}</span>
+                </div>
+              </div></CardContent></Card>;
+            }
             return <Card className="mt-4"><CardContent><div className="text-muted-foreground text-sm">{tr('selectAllFiltersToSeeStudents','Selecciona nivel, curso, sección y semestre para ver estudiantes')}</div></CardContent></Card>;
           }
           
@@ -6114,6 +6426,36 @@ export default function GradesPage() {
                 if (nameSet.size === 0) {
                   subjects.forEach(su => { if (su?.name) nameSet.add(String(su.name)); });
                 }
+              } else if (user?.role === 'guardian') {
+                // 🎓 APODERADO: Todas las asignaturas del curso/sección del estudiante seleccionado
+                console.log(`👨‍👩‍👧 [Asignaturas Guardian] Cargando asignaturas para sección:`, cascadeSectionId);
+                teacherAssignments.forEach(a => {
+                  if (!a || !a.sectionId) return;
+                  
+                  // Solo mostrar asignaturas de la sección del estudiante seleccionado
+                  if (String(a.sectionId) !== String(cascadeSectionId)) return;
+                  
+                  const names: string[] = Array.isArray(a.subjects) ? a.subjects : (a.subjectName ? [a.subjectName] : []);
+                  names.forEach(n => { if (n) nameSet.add(String(n)); });
+                });
+                
+                // Fallback: si no hay teacher-assignments, extraer de calificaciones
+                if (nameSet.size === 0 && filteredGrades.length > 0) {
+                  console.log(`👨‍👩‍👧 [Asignaturas Guardian] Fallback: extrayendo de calificaciones`);
+                  filteredGrades.forEach(g => {
+                    const found = subjects.find(su => String(su.id) === String(g.subjectId));
+                    const name = found?.name || (g.subjectId ? String(g.subjectId).replace(/_/g, ' ') : (g as any).subject ? String((g as any).subject) : '');
+                    if (name) nameSet.add(String(name));
+                  });
+                }
+                
+                // Si aún no hay, usar catálogo global del nivel
+                if (nameSet.size === 0) {
+                  console.log(`👨‍👩‍👧 [Asignaturas Guardian] Usando catálogo global del nivel`);
+                  subjects.forEach(su => { if (su?.name) nameSet.add(String(su.name)); });
+                }
+                
+                console.log(`👨‍👩‍👧 [Asignaturas Guardian] Total asignaturas encontradas:`, nameSet.size);
               } else {
                 // Admin: todas las asignaturas del curso seleccionado
                 teacherAssignments.forEach(a => {
