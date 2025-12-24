@@ -49,7 +49,7 @@ export function BookCourseSelector({
     return s;
   };
 
-  // Helper: cursos accesibles para estudiante; si no hay en activeCourses, derivar desde usuario o asignaciones
+  // Helper: cursos accesibles para estudiante; si no hay en activeCourses, derivar desde usuario completo en localStorage o desde asignaciones
   const getStudentAccessibleCourses = (): string[] => {
     const base = getAccessibleCourses() || [];
     if (user?.role !== 'student') return base;
@@ -60,28 +60,36 @@ export function BookCourseSelector({
     const names = new Set<string>();
 
     try {
-      // 1) Revisar datos directos del usuario (course, enrolledCourses, activeCourseNames)
-      if (user.course) {
-        names.add(normalizeCourseName(user.course));
-      }
+      // Intentar obtener el usuario completo desde localStorage (gestion de usuarios)
+      const storedUsers = localStorage.getItem('smart-student-users');
+      if (storedUsers) {
+        const usersData = JSON.parse(storedUsers);
+        const fullUserData = usersData.find((u: any) => String(u.id) === String(user.id) || String(u.username) === String(user.username));
+        if (fullUserData) {
+          console.log('📚 [BookSelector] getStudentAccessibleCourses - fullUserData found in localStorage for', user.username);
 
-      if (Array.isArray(user.enrolledCourses) && user.enrolledCourses.length > 0) {
-        for (const entry of user.enrolledCourses) {
-          const raw = typeof entry === 'string' ? entry : (entry?.name || '');
-          if (raw) names.add(normalizeCourseName(raw));
+          if (fullUserData.course) names.add(normalizeCourseName(fullUserData.course));
+
+          if (Array.isArray(fullUserData.enrolledCourses) && fullUserData.enrolledCourses.length > 0) {
+            for (const entry of fullUserData.enrolledCourses) {
+              const raw = typeof entry === 'string' ? entry : (entry?.name || '');
+              if (raw) names.add(normalizeCourseName(raw));
+            }
+          }
+
+          if (Array.isArray(fullUserData.activeCourseNames) && fullUserData.activeCourseNames.length > 0) {
+            for (const entry of fullUserData.activeCourseNames) {
+              const raw = typeof entry === 'string' ? entry : (entry?.name || '');
+              if (raw) names.add(normalizeCourseName(raw));
+            }
+          }
+
+          if (names.size > 0) {
+            const res = Array.from(names);
+            console.log('📚 [BookSelector] getStudentAccessibleCourses =>', res);
+            return res;
+          }
         }
-      }
-
-      if (Array.isArray(user.activeCourseNames) && user.activeCourseNames.length > 0) {
-        for (const entry of user.activeCourseNames) {
-          const raw = typeof entry === 'string' ? entry : (entry?.name || '');
-          if (raw) names.add(normalizeCourseName(raw));
-        }
-      }
-
-      // If we already found something from user object, return it
-      if (names.size > 0) {
-        return Array.from(names);
       }
 
       // 2) Fallback: buscar en studentAssignments
@@ -111,6 +119,7 @@ export function BookCourseSelector({
       }
 
       const list = Array.from(names);
+      console.log('📚 [BookSelector] getStudentAccessibleCourses fallback =>', list.length > 0 ? list : base);
       return list.length > 0 ? list : base;
     } catch (err) {
       console.warn('[BookSelector] Error al derivar cursos accesibles para estudiante:', err);
