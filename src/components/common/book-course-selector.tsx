@@ -410,10 +410,12 @@ export function BookCourseSelector({
   } else {
     // Admin: todos; Estudiante: usar activeCourses o derivar desde asignaciones si vacío
     const userAccessibleCourses = user?.role === 'student' ? getStudentAccessibleCourses() : getAccessibleCourses();
+    console.log('📚 [BookSelector] userAccessibleCourses:', userAccessibleCourses, 'user:', user?.username, 'role:', user?.role);
     const accessibleCourses = isUserAdmin ? Object.keys(courses || {}) : (userAccessibleCourses || []);
     filteredCourses = Object.keys(courses || {}).filter(course => 
       Array.isArray(accessibleCourses) && accessibleCourses.includes(course)
     );
+    console.log('📚 [BookSelector] filteredCourses computed:', filteredCourses);
   }
 
   // Cargar asignaturas disponibles según rol y curso seleccionado
