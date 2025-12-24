@@ -284,9 +284,10 @@ export default function LibrosPage() {
       console.log('📚 [Libros] Usuario completo:', fullUserData ? {
         id: fullUserData.id,
         username: fullUserData.username,
-        courseId: fullUserData.courseId,
-        sectionId: fullUserData.sectionId,
-        activeCourses: fullUserData.activeCourses
+        course: fullUserData.course,
+        section: fullUserData.section,
+        enrolledCourses: fullUserData.enrolledCourses,
+        activeCourseNames: fullUserData.activeCourseNames
       } : 'NO ENCONTRADO');
       
       if (!fullUserData) {
@@ -296,16 +297,35 @@ export default function LibrosPage() {
       
       const names = new Set<string>();
       
-      // MÉTODO 1: courseId y sectionId directamente en el usuario (Gestión de Usuarios)
-      if (fullUserData.courseId && fullUserData.sectionId) {
-        const course = coursesData.find((c: any) => c.id === fullUserData.courseId);
-        if (course?.name) {
-          console.log('📚 [Libros] ✅ Curso encontrado por courseId directo:', course.name);
-          names.add(normalizeCourseNameForBooks(course.name));
+      // MÉTODO 1: 'course' y 'section' directamente en el usuario (formato estándar)
+      if (fullUserData.course) {
+        // El campo 'course' ya contiene el nombre como "1ro Básico"
+        console.log('📚 [Libros] ✅ Curso encontrado por campo course:', fullUserData.course);
+        names.add(normalizeCourseNameForBooks(fullUserData.course));
+      }
+      
+      // MÉTODO 2: enrolledCourses array (ej: ["1ro Básico A"])
+      if (names.size === 0 && Array.isArray(fullUserData.enrolledCourses) && fullUserData.enrolledCourses.length > 0) {
+        for (const courseEntry of fullUserData.enrolledCourses) {
+          const courseName = typeof courseEntry === 'string' ? courseEntry : (courseEntry?.name || '');
+          if (courseName) {
+            console.log('📚 [Libros] ✅ Curso encontrado por enrolledCourses:', courseName);
+            names.add(normalizeCourseNameForBooks(courseName));
+          }
         }
       }
       
-      // MÉTODO 2: Solo courseId (sin sectionId)
+      // MÉTODO 3: activeCourseNames array (ej: ["1ro Básico A"])
+      if (names.size === 0 && Array.isArray(fullUserData.activeCourseNames) && fullUserData.activeCourseNames.length > 0) {
+        for (const courseName of fullUserData.activeCourseNames) {
+          if (courseName) {
+            console.log('📚 [Libros] ✅ Curso encontrado por activeCourseNames:', courseName);
+            names.add(normalizeCourseNameForBooks(courseName));
+          }
+        }
+      }
+      
+      // MÉTODO 4: courseId y sectionId (formato alternativo con IDs)
       if (names.size === 0 && fullUserData.courseId) {
         const course = coursesData.find((c: any) => c.id === fullUserData.courseId);
         if (course?.name) {
@@ -314,7 +334,7 @@ export default function LibrosPage() {
         }
       }
       
-      // MÉTODO 3: Solo sectionId (derivar courseId desde la sección)
+      // MÉTODO 5: Solo sectionId (derivar courseId desde la sección)
       if (names.size === 0 && fullUserData.sectionId) {
         const section = sections.find((s: any) => s.id === fullUserData.sectionId);
         if (section) {
@@ -326,7 +346,7 @@ export default function LibrosPage() {
         }
       }
       
-      // MÉTODO 4: Buscar asignación en studentAssignments (comparación flexible)
+      // MÉTODO 6: Buscar asignación en studentAssignments (comparación flexible)
       if (names.size === 0) {
         console.log('📚 [Libros] Buscando en studentAssignments para ID:', fullUserData.id, 'username:', fullUserData.username);
         
@@ -367,21 +387,7 @@ export default function LibrosPage() {
         }
       }
       
-      // MÉTODO 5: Parsear activeCourses estilo "1ro Básico - Sección A"
-      if (names.size === 0 && Array.isArray(fullUserData.activeCourses) && fullUserData.activeCourses.length > 0) {
-        for (const entry of fullUserData.activeCourses) {
-          let raw = typeof entry === 'string' ? entry : (entry?.name || entry?.id || '');
-          if (raw) {
-            // Extraer nombre de curso (antes de " - Sección")
-            const match = raw.match(/^(.+?)\s*-\s*Sección/i);
-            const courseName = match ? match[1].trim() : raw;
-            console.log('📚 [Libros] ✅ Curso parseado de activeCourses:', courseName);
-            names.add(normalizeCourseNameForBooks(courseName));
-          }
-        }
-      }
-      
-      // MÉTODO 6: Fallback a getAccessibleCourses del contexto
+      // MÉTODO 7: Fallback a getAccessibleCourses del contexto
       if (names.size === 0) {
         const base = getAccessibleCourses() || [];
         console.log('📚 [Libros] Fallback a getAccessibleCourses:', base);
