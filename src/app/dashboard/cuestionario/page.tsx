@@ -1,18 +1,20 @@
 
 "use client";
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/language-context';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileQuestion, Sparkles, Download, Newspaper, Network, ClipboardList } from 'lucide-react';
+import { FileQuestion, Sparkles, Download, Newspaper, Network, ClipboardList, BookOpen, Loader2 } from 'lucide-react';
 import { BookCourseSelector } from '@/components/common/book-course-selector';
 import { generateQuiz } from '@/ai/flows/generate-quiz';
+import { analyzeMathPdfTopics } from '@/ai/flows/analyze-math-pdf-topics';
 import { useToast } from "@/hooks/use-toast";
 import { useAIProgress } from "@/hooks/use-ai-progress";
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { contentDB } from '@/lib/sql-content';
 import { useAuth } from '@/contexts/auth-context';
@@ -33,8 +35,64 @@ export default function CuestionarioPage() {
   const [quizResult, setQuizResult] = useState('');
   const [currentTopicForDisplay, setCurrentTopicForDisplay] = useState('');
   
+  // Estados para análisis automático de PDF de matemáticas
+  const [mathTopics, setMathTopics] = useState<string[]>([]);
+  const [selectedMathTopic, setSelectedMathTopic] = useState<string>('');
+  const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
+  const [mathBookTitle, setMathBookTitle] = useState<string>('');
+  
   // Ref para evitar llamadas duplicadas
   const isGeneratingRef = useRef(false);
+  const hasAnalyzedRef = useRef<string>('');
+
+  // Detectar si es asignatura de matemáticas
+  const isMathSelection = useMemo(() => {
+    const s = `${selectedBook || ''} ${selectedSubject || ''}`.toLowerCase();
+    return /matem|math|algebra|geometr|trigonom|calculo|aritmet|matriz|matrices|estadistic|probabil/i.test(s);
+  }, [selectedBook, selectedSubject]);
+
+  // Analizar automáticamente el PDF de matemáticas cuando se selecciona la asignatura
+  useEffect(() => {
+    const analyzeKey = `${selectedCourse}_${selectedSubject}`;
+    
+    if (isMathSelection && selectedCourse && hasAnalyzedRef.current !== analyzeKey) {
+      hasAnalyzedRef.current = analyzeKey;
+      setIsAnalyzingPdf(true);
+      setMathTopics([]);
+      setSelectedMathTopic('');
+      setMathBookTitle('');
+      
+      analyzeMathPdfTopics({
+        courseName: selectedCourse,
+        language: currentUiLanguage,
+      }).then((res) => {
+        if (res.topics && res.topics.length > 0) {
+          setMathTopics(res.topics);
+          setMathBookTitle(res.bookTitle || '');
+          toast({
+            title: translate('quizPdfAnalyzeDone', { defaultValue: 'Análisis completado' }),
+            description: `${translate('quizPdfTopicsFound', { defaultValue: 'Temas detectados' })}: ${res.topics.length}`,
+            variant: 'default',
+          });
+        }
+      }).catch((e) => {
+        console.error('[Quiz] Error analizando PDF:', e);
+      }).finally(() => {
+        setIsAnalyzingPdf(false);
+      });
+    } else if (!isMathSelection) {
+      // Limpiar cuando no es matemáticas
+      setMathTopics([]);
+      setSelectedMathTopic('');
+      setMathBookTitle('');
+    }
+  }, [isMathSelection, selectedCourse, selectedSubject, currentUiLanguage, toast, translate]);
+
+  // Cuando se selecciona un tema del PDF, actualizar el campo de tema
+  const handleSelectMathTopic = useCallback((value: string) => {
+    setSelectedMathTopic(value);
+    if (value) setTopic(value);
+  }, []);
 
   // Función para generar clave de caché
   const getCacheKey = useCallback((book: string, subject: string, course: string, topicStr: string, lang: string) => {
@@ -263,6 +321,56 @@ export default function CuestionarioPage() {
             onBookChange={setSelectedBook}
             onSubjectChange={setSelectedSubject}
           />
+
+          {/* Sección automática de temas de matemáticas desde el PDF de la biblioteca */}
+          {isMathSelection && (
+            <div className="space-y-3 p-4 border border-cyan-500/30 rounded-lg bg-cyan-500/5">
+              <div className="space-y-1">
+                <Label className="text-left block font-semibold text-cyan-600 dark:text-cyan-400">
+                  <BookOpen className="w-4 h-4 inline mr-2" />
+                  {translate('quizMathPdfTitle', { defaultValue: 'Temas del Libro de Matemáticas' })}
+                </Label>
+                {mathBookTitle && (
+                  <p className="text-left text-xs text-muted-foreground">
+                    📚 {mathBookTitle}
+                  </p>
+                )}
+              </div>
+
+              {isAnalyzingPdf ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {translate('quizMathAnalyzing', { defaultValue: 'Analizando libro de matemáticas con IA...' })}
+                </div>
+              ) : mathTopics.length > 0 ? (
+                <div className="space-y-2">
+                  <Label className="text-left block text-sm">
+                    {translate('quizMathSelectTopic', { defaultValue: 'Selecciona un tema para generar problemas con desarrollo:' })}
+                  </Label>
+                  <Select value={selectedMathTopic} onValueChange={handleSelectMathTopic}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={translate('quizMathChooseTopic', { defaultValue: 'Elige un tema matemático…' })} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mathTopics.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-left text-xs text-muted-foreground">
+                    💡 {translate('quizMathHint', { defaultValue: 'Al generar el cuestionario, incluirá problemas con desarrollo paso a paso y verificación.' })}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-left text-xs text-muted-foreground">
+                  {translate('quizMathNoTopics', { defaultValue: 'Selecciona un curso para ver los temas disponibles.' })}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="quiz-topic-input" className="text-left block">{translate('quizTopicPlaceholder')}</Label>
             <Textarea

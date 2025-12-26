@@ -48,7 +48,115 @@ const RenderImageInputSchema = MindMapStructureSchema.extend({
 export type RenderImageInput = z.infer<typeof RenderImageInputSchema>;
 
 
-// Prompt to generate the mind map's textual structure
+// =============================================================================
+// FUNCIÓN PARA DETECTAR SI ES ASIGNATURA DE MATEMÁTICAS
+// =============================================================================
+function isMathSubject(bookTitle: string, centralTheme?: string): boolean {
+  const lowerTitle = bookTitle.toLowerCase();
+  const lowerTheme = (centralTheme || '').toLowerCase();
+  
+  // Lista de palabras clave que indican matemáticas
+  const mathKeywords = [
+    'matemática', 'matematica', 'matemáticas', 'matematicas', 'math',
+    'álgebra', 'algebra', 'geometría', 'geometria', 
+    'cálculo', 'calculo', 'aritmética', 'aritmetica',
+    'trigonometría', 'trigonometria',
+    // Temas matemáticos específicos
+    'suma', 'sumas', 'resta', 'restas', 'adición', 'sustracción',
+    'multiplicación', 'multiplicacion', 'división', 'division',
+    'fracción', 'fracciones', 'fraccion',
+    'ecuación', 'ecuacion', 'ecuaciones',
+    'porcentaje', 'porcentajes',
+    'potencia', 'potencias', 'raíz', 'raiz', 'raíces',
+    'área', 'area', 'perímetro', 'perimetro',
+    'pitágoras', 'pitagoras',
+    'números', 'numeros', 'decimales',
+    'proporción', 'proporcion', 'razón', 'razon'
+  ];
+  
+  // Verificar si el título o el tema contienen palabras clave de matemáticas
+  for (const keyword of mathKeywords) {
+    if (lowerTitle.includes(keyword) || lowerTheme.includes(keyword)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// =============================================================================
+// PROMPT ESPECIALIZADO PARA MATEMÁTICAS
+// =============================================================================
+const generateMathMindMapStructurePrompt = ai.definePrompt({
+  name: 'generateMathMindMapStructurePrompt',
+  input: { schema: CreateMindMapInputSchema },
+  output: { schema: MindMapStructureSchema },
+  prompt: `Eres un experto en didáctica de matemáticas y diseño instruccional.
+Genera una estructura jerárquica para un MAPA MENTAL ESPECIALIZADO EN MATEMÁTICAS.
+El tema central es: "{{centralTheme}}" de la asignatura "{{bookTitle}}".
+El idioma para todos los nodos debe ser: {{language}}.
+
+IMPORTANTE - Este es un mapa mental de MATEMÁTICAS, por lo tanto debe incluir:
+
+1. **FÓRMULAS Y NOTACIÓN MATEMÁTICA**: Incluye fórmulas clave usando notación simple (por ejemplo: "a² + b² = c²", "A = π·r²", "x = (-b±√Δ)/2a")
+
+2. **PROCEDIMIENTOS Y PASOS**: Para resolver problemas, incluye los pasos numerados o secuenciales
+
+3. **EJEMPLOS CON EJERCICIOS**: Incluye ejemplos numéricos concretos que ilustren el concepto (ej: "Ej: 3² + 4² = 5²")
+
+4. **PROPIEDADES Y TEOREMAS**: Menciona propiedades, axiomas o teoremas relevantes
+
+5. **CASOS ESPECIALES**: Si aplica, incluye casos particulares o excepciones
+
+Tu estructura debe tener:
+- 1 nodo central con el tema principal
+- 4-5 ramas principales que pueden ser: Definición, Fórmulas, Procedimiento, Ejemplos, Aplicaciones
+- 2-3 subnodos por rama con contenido específico matemático
+
+Ejemplo de estructura para "Ecuación Cuadrática":
+{
+  "centralThemeLabel": "ECUACIÓN CUADRÁTICA ax²+bx+c=0",
+  "mainBranches": [
+    { 
+      "label": "📐 Fórmula General", 
+      "children": [
+        { "label": "x = (-b±√Δ)/2a" }, 
+        { "label": "Δ = b² - 4ac" }
+      ] 
+    },
+    { 
+      "label": "🔢 Procedimiento", 
+      "children": [
+        { "label": "1. Identificar a,b,c" }, 
+        { "label": "2. Calcular Δ" },
+        { "label": "3. Aplicar fórmula" }
+      ] 
+    },
+    { 
+      "label": "✏️ Ejemplo Resuelto", 
+      "children": [
+        { "label": "x²-5x+6=0" }, 
+        { "label": "x₁=2, x₂=3" }
+      ] 
+    },
+    { 
+      "label": "📊 Tipo de Raíces", 
+      "children": [
+        { "label": "Δ>0: 2 reales" }, 
+        { "label": "Δ=0: 1 real doble" },
+        { "label": "Δ<0: complejas" }
+      ] 
+    }
+  ]
+}
+
+NOTA: Usa emojis apropiados para las ramas principales (📐🔢✏️📊📏🧮) pero NO en los subnodos.
+Mantén las fórmulas y notación matemática claras y legibles.
+El contenido debe ser PRÁCTICO y orientado a EJERCICIOS, no solo teórico.
+`,
+});
+
+// Prompt to generate the mind map's textual structure (for non-math subjects)
 const generateMindMapStructurePrompt = ai.definePrompt({
   name: 'generateMindMapStructurePrompt',
   // Input uses CreateMindMapInputSchema to get language, theme, book
@@ -148,17 +256,39 @@ If any text is distorted, unreadable, or omitted, or if any text is added that w
 
 
 export async function createMindMap(input: CreateMindMapInput): Promise<CreateMindMapOutput> {
+  // Detectar si es asignatura de matemáticas (verifica tanto bookTitle como centralTheme)
+  const isMatematicas = isMathSubject(input.bookTitle, input.centralTheme);
+  
   console.log('🧠 createMindMap - HÍBRIDO: IA para contenido + SVG para imagen');
   console.log('📋 Input recibido:', {
     centralTheme: input.centralTheme,
     bookTitle: input.bookTitle,
     language: input.language,
-    isHorizontal: input.isHorizontal
+    isHorizontal: input.isHorizontal,
+    isMathSubject: isMatematicas
   });
   
+  // Para MATEMÁTICAS: Usar estructura predefinida con ejercicios reales
+  // Esto garantiza contenido específico y útil para el estudio
+  if (isMatematicas) {
+    console.log('📐 Detectada asignatura de MATEMÁTICAS - Usando estructura especializada con ejercicios');
+    
+    // Usar estructura predefinida de matemáticas (con ejercicios reales)
+    const mathStructure = generateMathMockStructure(input);
+    console.log('📊 Estructura matemática generada:', mathStructure);
+    
+    // Generar SVG especializado para matemáticas
+    const mathSvg = generateMathSvg(mathStructure, input.isHorizontal);
+    console.log('🎨 SVG matemático generado - Longitud:', mathSvg.length);
+    
+    const dataUri = `data:image/svg+xml;base64,${Buffer.from(mathSvg).toString('base64')}`;
+    console.log('✅ Mapa mental de matemáticas generado exitosamente');
+    return { imageDataUri: dataUri };
+  }
+  
+  // Para otras asignaturas: Usar IA para generar contenido
   try {
-    // PASO 1: Usar IA para generar contenido intelectual (nodos y subnodos)
-    console.log('🤖 Generando contenido con IA...');
+    console.log('🤖 Generando contenido con IA para asignatura no-matemática...');
     const structureResponse = await generateMindMapStructurePrompt(input);
     const aiGeneratedStructure = structureResponse.output;
 
@@ -168,12 +298,10 @@ export async function createMindMap(input: CreateMindMapInput): Promise<CreateMi
 
     console.log('📊 Estructura generada por IA:', aiGeneratedStructure);
     
-    // PASO 2: Usar SVG manual para generar imagen ultra-clara
     console.log('🎨 Generando SVG mejorado...');
     const enhancedSvg = generateEnhancedSvg(aiGeneratedStructure, input.isHorizontal);
     console.log('🎨 SVG mejorado generado exitosamente - Longitud:', enhancedSvg.length);
     
-    // Convertir a Data URI
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(enhancedSvg).toString('base64')}`;
     
     console.log('✅ Mapa mental híbrido generado exitosamente');
@@ -182,7 +310,7 @@ export async function createMindMap(input: CreateMindMapInput): Promise<CreateMi
   } catch (error) {
     console.error('❌ Error en generación híbrida, usando fallback:', error);
     
-    // Fallback con estructura inteligente basada en tema
+    // Fallback con estructura genérica
     const fallbackStructure = generateMockMindMapStructure(input);
     const fallbackSvg = generateEnhancedSvg(fallbackStructure, input.isHorizontal);
     const dataUri = `data:image/svg+xml;base64,${Buffer.from(fallbackSvg).toString('base64')}`;
@@ -1092,4 +1220,1105 @@ function smartTextWrap(text: string, maxChars: number): string[] {
 // Función de utilidad para compatibilidad con el diseño anterior
 function enhancedTextWrap(text: string, maxChars: number): string[] {
   return smartTextWrap(text, maxChars);
+}
+
+// =============================================================================
+// FUNCIONES ESPECIALIZADAS PARA MATEMÁTICAS
+// =============================================================================
+
+/**
+ * Genera estructura mock especializada para temas matemáticos
+ */
+function generateMathMockStructure(input: CreateMindMapInput): MindMapStructure {
+  const centralTheme = input.centralTheme.toLowerCase();
+  const language = input.language;
+  
+  // Mapeo de temas matemáticos con ejercicios, fórmulas y procedimientos
+  const mathTopicMappings: Record<string, {centralLabel: string, branches: Array<{label: string, children: string[]}>}> = {
+    // =====================================================================
+    // OPERACIONES BÁSICAS - SUMAS, RESTAS, ETC.
+    // =====================================================================
+    'suma': {
+      centralLabel: language === 'es' ? 'SUMA ➕' : 'ADDITION ➕',
+      branches: [
+        {
+          label: language === 'es' ? '🖐️ Usar Dedos' : '🖐️ Use Fingers',
+          children: language === 'es' 
+            ? ['3 + 2 = 5 ✋', '4 + 1 = 5', '2 + 3 = 5']
+            : ['3 + 2 = 5 ✋', '4 + 1 = 5', '2 + 3 = 5']
+        },
+        {
+          label: language === 'es' ? '0️⃣ Sumar Cero' : '0️⃣ Add Zero',
+          children: language === 'es'
+            ? ['5 + 0 = 5', '3 + 0 = 3', '0 + 7 = 7']
+            : ['5 + 0 = 5', '3 + 0 = 3', '0 + 7 = 7']
+        },
+        {
+          label: language === 'es' ? '🔟 Formar 10' : '🔟 Make 10',
+          children: language === 'es'
+            ? ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+            : ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+        },
+        {
+          label: language === 'es' ? '👯 Dobles' : '👯 Doubles',
+          children: language === 'es'
+            ? ['2 + 2 = 4', '5 + 5 = 10', '3 + 3 = 6']
+            : ['2 + 2 = 4', '5 + 5 = 10', '3 + 3 = 6']
+        }
+      ]
+    },
+    'sumas': {
+      centralLabel: language === 'es' ? 'SUMAS ➕' : 'ADDITION ➕',
+      branches: [
+        {
+          label: language === 'es' ? '🖐️ Usar Dedos' : '🖐️ Use Fingers',
+          children: language === 'es' 
+            ? ['3 + 2 = 5 ✋', '4 + 1 = 5', '2 + 3 = 5']
+            : ['3 + 2 = 5 ✋', '4 + 1 = 5', '2 + 3 = 5']
+        },
+        {
+          label: language === 'es' ? '0️⃣ Sumar Cero' : '0️⃣ Add Zero',
+          children: language === 'es'
+            ? ['5 + 0 = 5', '3 + 0 = 3', '0 + 7 = 7']
+            : ['5 + 0 = 5', '3 + 0 = 3', '0 + 7 = 7']
+        },
+        {
+          label: language === 'es' ? '🔟 Formar 10' : '🔟 Make 10',
+          children: language === 'es'
+            ? ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+            : ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+        },
+        {
+          label: language === 'es' ? '👯 Dobles' : '👯 Doubles',
+          children: language === 'es'
+            ? ['2 + 2 = 4', '5 + 5 = 10', '3 + 3 = 6']
+            : ['2 + 2 = 4', '5 + 5 = 10', '3 + 3 = 6']
+        }
+      ]
+    },
+    'resta': {
+      centralLabel: language === 'es' ? 'RESTA a - b = c' : 'SUBTRACTION a - b = c',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Términos' : '📐 Terms',
+          children: language === 'es' 
+            ? ['a = minuendo', 'b = sustraendo', 'c = diferencia']
+            : ['a = minuend', 'b = subtrahend', 'c = difference']
+        },
+        {
+          label: language === 'es' ? '🔢 Ejemplos' : '🔢 Examples',
+          children: language === 'es'
+            ? ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+            : ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejercicios' : '✏️ Exercises',
+          children: language === 'es'
+            ? ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+            : ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+        },
+        {
+          label: language === 'es' ? '✓ Prueba' : '✓ Check',
+          children: language === 'es'
+            ? ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+            : ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+        }
+      ]
+    },
+    'restas': {
+      centralLabel: language === 'es' ? 'RESTAS a - b = c' : 'SUBTRACTION a - b = c',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Términos' : '📐 Terms',
+          children: language === 'es' 
+            ? ['a = minuendo', 'b = sustraendo', 'c = diferencia']
+            : ['a = minuend', 'b = subtrahend', 'c = difference']
+        },
+        {
+          label: language === 'es' ? '🔢 Ejemplos' : '🔢 Examples',
+          children: language === 'es'
+            ? ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+            : ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejercicios' : '✏️ Exercises',
+          children: language === 'es'
+            ? ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+            : ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+        },
+        {
+          label: language === 'es' ? '✓ Prueba' : '✓ Check',
+          children: language === 'es'
+            ? ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+            : ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+        }
+      ]
+    },
+    'adición': {
+      centralLabel: language === 'es' ? 'ADICIÓN a + b = c' : 'ADDITION a + b = c',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Propiedades' : '📐 Properties',
+          children: language === 'es' 
+            ? ['a+b = b+a', '(a+b)+c = a+(b+c)', 'a + 0 = a']
+            : ['a+b = b+a', '(a+b)+c = a+(b+c)', 'a + 0 = a']
+        },
+        {
+          label: language === 'es' ? '🔢 Ejemplos' : '🔢 Examples',
+          children: language === 'es'
+            ? ['8 + 7 = 15', '27 + 35 = 62', '148 + 275 = 423']
+            : ['8 + 7 = 15', '27 + 35 = 62', '148 + 275 = 423']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejercicios' : '✏️ Exercises',
+          children: language === 'es'
+            ? ['25 + 18 = ?', '156 + 89 = ?', '999 + 1 = ?']
+            : ['25 + 18 = ?', '156 + 89 = ?', '999 + 1 = ?']
+        },
+        {
+          label: language === 'es' ? '💡 Trucos' : '💡 Tricks',
+          children: language === 'es'
+            ? ['99+1 = 100', '47+3 = 50', '25+25 = 50']
+            : ['99+1 = 100', '47+3 = 50', '25+25 = 50']
+        }
+      ]
+    },
+    'sustracción': {
+      centralLabel: language === 'es' ? 'SUSTRACCIÓN a - b = c' : 'SUBTRACTION a - b = c',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Términos' : '📐 Terms',
+          children: language === 'es' 
+            ? ['a = minuendo', 'b = sustraendo', 'c = diferencia']
+            : ['a = minuend', 'b = subtrahend', 'c = difference']
+        },
+        {
+          label: language === 'es' ? '🔢 Ejemplos' : '🔢 Examples',
+          children: language === 'es'
+            ? ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+            : ['42 - 17 = 25', '100 - 36 = 64', '305 - 148 = 157']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejercicios' : '✏️ Exercises',
+          children: language === 'es'
+            ? ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+            : ['85 - 37 = ?', '200 - 86 = ?', '500 - 123 = ?']
+        },
+        {
+          label: language === 'es' ? '✓ Prueba' : '✓ Check',
+          children: language === 'es'
+            ? ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+            : ['c + b = a', '25 + 17 = 42', '64 + 36 = 100']
+        }
+      ]
+    },
+    'tablas de multiplicar': {
+      centralLabel: language === 'es' ? 'TABLAS MULTIPLICAR' : 'TIMES TABLES',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Tabla 7' : '📐 Table 7',
+          children: language === 'es' 
+            ? ['7×6 = 42', '7×7 = 49', '7×8 = 56']
+            : ['7×6 = 42', '7×7 = 49', '7×8 = 56']
+        },
+        {
+          label: language === 'es' ? '🔢 Tabla 8' : '🔢 Table 8',
+          children: language === 'es'
+            ? ['8×6 = 48', '8×7 = 56', '8×8 = 64']
+            : ['8×6 = 48', '8×7 = 56', '8×8 = 64']
+        },
+        {
+          label: language === 'es' ? '✏️ Tabla 9' : '✏️ Table 9',
+          children: language === 'es'
+            ? ['9×6 = 54', '9×7 = 63', '9×8 = 72']
+            : ['9×6 = 54', '9×7 = 63', '9×8 = 72']
+        },
+        {
+          label: language === 'es' ? '💡 Truco 9' : '💡 9 Trick',
+          children: language === 'es'
+            ? ['Usa dedos', '9×4 = 36', '9×7 = 63']
+            : ['Use fingers', '9×4 = 36', '9×7 = 63']
+        }
+      ]
+    },
+    'números decimales': {
+      centralLabel: language === 'es' ? 'DECIMALES' : 'DECIMALS',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Lectura' : '📐 Reading',
+          children: language === 'es' 
+            ? ['0,5 = 5 décimos', '0,25 = 25 cents.', '3,14 = pi']
+            : ['0.5 = 5 tenths', '0.25 = 25 hunds.', '3.14 = pi']
+        },
+        {
+          label: language === 'es' ? '🔢 Suma' : '🔢 Add',
+          children: language === 'es'
+            ? ['Alinear comas', '2,5 + 1,25', '= 3,75']
+            : ['Align decimals', '2.5 + 1.25', '= 3.75']
+        },
+        {
+          label: language === 'es' ? '✖️ Multiplicar' : '✖️ Multiply',
+          children: language === 'es'
+            ? ['Sin coma', '2,5 × 0,4', '= 1,00']
+            : ['No decimal', '2.5 × 0.4', '= 1.00']
+        },
+        {
+          label: language === 'es' ? '➗ Dividir' : '➗ Divide',
+          children: language === 'es'
+            ? ['7,5 ÷ 2,5 = 3', '10 ÷ 0,5 = 20', '6 ÷ 0,2 = 30']
+            : ['7.5 ÷ 2.5 = 3', '10 ÷ 0.5 = 20', '6 ÷ 0.2 = 30']
+        }
+      ]
+    },
+    'potencias': {
+      centralLabel: language === 'es' ? 'POTENCIAS aⁿ' : 'POWERS aⁿ',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Qué es' : '📐 What is',
+          children: language === 'es' 
+            ? ['aⁿ = a×a×...n', 'a = base', 'n = exponente']
+            : ['aⁿ = a×a×...n', 'a = base', 'n = exponent']
+        },
+        {
+          label: language === 'es' ? '🔢 Reglas' : '🔢 Rules',
+          children: language === 'es'
+            ? ['aᵐ × aⁿ = aᵐ⁺ⁿ', 'aᵐ ÷ aⁿ = aᵐ⁻ⁿ', '(aᵐ)ⁿ = aᵐˣⁿ']
+            : ['aᵐ × aⁿ = aᵐ⁺ⁿ', 'aᵐ ÷ aⁿ = aᵐ⁻ⁿ', '(aᵐ)ⁿ = aᵐˣⁿ']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplos' : '✏️ Examples',
+          children: language === 'es'
+            ? ['2³ = 2×2×2 = 8', '5² = 25', '10³ = 1.000']
+            : ['2³ = 2×2×2 = 8', '5² = 25', '10³ = 1,000']
+        },
+        {
+          label: language === 'es' ? '📊 Casos Especiales' : '📊 Special Cases',
+          children: language === 'es'
+            ? ['a⁰ = 1', 'a¹ = a', 'a⁻¹ = 1/a']
+            : ['a⁰ = 1', 'a¹ = a', 'a⁻¹ = 1/a']
+        }
+      ]
+    },
+    'raíces': {
+      centralLabel: language === 'es' ? 'RAÍCES √a' : 'ROOTS √a',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Definición' : '📐 Definition',
+          children: language === 'es' 
+            ? ['√a = b si b² = a', 'ⁿ√a = raíz n-ésima', 'Operación inversa potencia']
+            : ['√a = b if b² = a', 'ⁿ√a = nth root', 'Inverse of power']
+        },
+        {
+          label: language === 'es' ? '🔢 Raíces Perfectas' : '🔢 Perfect Roots',
+          children: language === 'es'
+            ? ['√4 = 2', '√9 = 3', '√16 = 4', '√25 = 5']
+            : ['√4 = 2', '√9 = 3', '√16 = 4', '√25 = 5']
+        },
+        {
+          label: language === 'es' ? '✏️ Propiedades' : '✏️ Properties',
+          children: language === 'es'
+            ? ['√(a×b) = √a × √b', '√(a/b) = √a / √b', '√a² = |a|']
+            : ['√(a×b) = √a × √b', '√(a/b) = √a / √b', '√a² = |a|']
+        },
+        {
+          label: language === 'es' ? '📊 Aproximaciones' : '📊 Approximations',
+          children: language === 'es'
+            ? ['√2 ≈ 1,414', '√3 ≈ 1,732', '√5 ≈ 2,236']
+            : ['√2 ≈ 1.414', '√3 ≈ 1.732', '√5 ≈ 2.236']
+        }
+      ]
+    },
+    'razones y proporciones': {
+      centralLabel: language === 'es' ? 'RAZONES Y PROPORCIONES' : 'RATIOS AND PROPORTIONS',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Razón' : '📐 Ratio',
+          children: language === 'es' 
+            ? ['a:b = a/b', 'Comparación cociente', 'Ej: 3:4 = 3/4 = 0,75']
+            : ['a:b = a/b', 'Quotient comparison', 'Ex: 3:4 = 3/4 = 0.75']
+        },
+        {
+          label: language === 'es' ? '🔢 Proporción' : '🔢 Proportion',
+          children: language === 'es'
+            ? ['a/b = c/d', 'a×d = b×c', 'Medios = Extremos']
+            : ['a/b = c/d', 'a×d = b×c', 'Means = Extremes']
+        },
+        {
+          label: language === 'es' ? '✏️ Regla de 3' : '✏️ Rule of Three',
+          children: language === 'es'
+            ? ['a → b', 'c → x = (b×c)/a', 'Ej: 3→6, 5→x=10']
+            : ['a → b', 'c → x = (b×c)/a', 'Ex: 3→6, 5→x=10']
+        },
+        {
+          label: language === 'es' ? '📊 Directa/Inversa' : '📊 Direct/Inverse',
+          children: language === 'es'
+            ? ['Directa: ↑ más → ↑ más', 'Inversa: ↑ más → ↓ menos', 'Identificar tipo']
+            : ['Direct: ↑ more → ↑ more', 'Inverse: ↑ more → ↓ less', 'Identify type']
+        }
+      ]
+    },
+    // ARITMÉTICA Y OPERACIONES BÁSICAS
+    'fracciones': {
+      centralLabel: language === 'es' ? 'FRACCIONES a/b' : 'FRACTIONS a/b',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Definición' : '📐 Definition',
+          children: language === 'es' 
+            ? ['a = numerador', 'b = denominador', 'b ≠ 0']
+            : ['a = numerator', 'b = denominator', 'b ≠ 0']
+        },
+        {
+          label: language === 'es' ? '🔢 Suma y Resta' : '🔢 Add & Subtract',
+          children: language === 'es'
+            ? ['a/c + b/c = (a+b)/c', 'MCM para distintos', 'Ej: 1/2 + 1/4 = 3/4']
+            : ['a/c + b/c = (a+b)/c', 'LCM for different', 'Ex: 1/2 + 1/4 = 3/4']
+        },
+        {
+          label: language === 'es' ? '✖️ Multiplicación' : '✖️ Multiplication',
+          children: language === 'es'
+            ? ['a/b × c/d = ac/bd', 'Ej: 2/3 × 1/2 = 2/6 = 1/3', 'Simplificar resultado']
+            : ['a/b × c/d = ac/bd', 'Ex: 2/3 × 1/2 = 2/6 = 1/3', 'Simplify result']
+        },
+        {
+          label: language === 'es' ? '➗ División' : '➗ Division',
+          children: language === 'es'
+            ? ['a/b ÷ c/d = a/b × d/c', 'Invertir y multiplicar', 'Ej: 3/4 ÷ 1/2 = 3/2']
+            : ['a/b ÷ c/d = a/b × d/c', 'Invert and multiply', 'Ex: 3/4 ÷ 1/2 = 3/2']
+        }
+      ]
+    },
+    'ecuación cuadrática': {
+      centralLabel: language === 'es' ? 'ECUACIÓN CUADRÁTICA ax²+bx+c=0' : 'QUADRATIC EQUATION ax²+bx+c=0',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Fórmula General' : '📐 General Formula',
+          children: language === 'es'
+            ? ['x = (-b±√Δ)/2a', 'Δ = b² - 4ac', 'Discriminante']
+            : ['x = (-b±√Δ)/2a', 'Δ = b² - 4ac', 'Discriminant']
+        },
+        {
+          label: language === 'es' ? '🔢 Procedimiento' : '🔢 Procedure',
+          children: language === 'es'
+            ? ['1. Identificar a,b,c', '2. Calcular Δ', '3. Aplicar fórmula']
+            : ['1. Identify a,b,c', '2. Calculate Δ', '3. Apply formula']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplo' : '✏️ Example',
+          children: language === 'es'
+            ? ['x²-5x+6=0', 'a=1, b=-5, c=6', 'x₁=2, x₂=3']
+            : ['x²-5x+6=0', 'a=1, b=-5, c=6', 'x₁=2, x₂=3']
+        },
+        {
+          label: language === 'es' ? '📊 Tipos de Raíces' : '📊 Root Types',
+          children: language === 'es'
+            ? ['Δ>0: 2 reales', 'Δ=0: 1 real doble', 'Δ<0: complejas']
+            : ['Δ>0: 2 real', 'Δ=0: 1 double', 'Δ<0: complex']
+        }
+      ]
+    },
+    'teorema de pitágoras': {
+      centralLabel: language === 'es' ? 'TEOREMA DE PITÁGORAS a²+b²=c²' : 'PYTHAGOREAN THEOREM a²+b²=c²',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Fórmula' : '📐 Formula',
+          children: language === 'es'
+            ? ['c² = a² + b²', 'c = √(a² + b²)', 'c = hipotenusa']
+            : ['c² = a² + b²', 'c = √(a² + b²)', 'c = hypotenuse']
+        },
+        {
+          label: language === 'es' ? '🔢 Para hallar cateto' : '🔢 Find leg',
+          children: language === 'es'
+            ? ['a² = c² - b²', 'a = √(c² - b²)', 'Solo triáng. rect.']
+            : ['a² = c² - b²', 'a = √(c² - b²)', 'Right triangle only']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplo Clásico' : '✏️ Classic Example',
+          children: language === 'es'
+            ? ['3² + 4² = 5²', '9 + 16 = 25', 'Terna: 3, 4, 5']
+            : ['3² + 4² = 5²', '9 + 16 = 25', 'Triple: 3, 4, 5']
+        },
+        {
+          label: language === 'es' ? '📏 Otras Ternas' : '📏 Other Triples',
+          children: language === 'es'
+            ? ['5, 12, 13', '8, 15, 17', '7, 24, 25']
+            : ['5, 12, 13', '8, 15, 17', '7, 24, 25']
+        }
+      ]
+    },
+    'porcentaje': {
+      centralLabel: language === 'es' ? 'PORCENTAJE %' : 'PERCENTAGE %',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Fórmula Base' : '📐 Base Formula',
+          children: language === 'es'
+            ? ['% = (parte/total)×100', 'Parte = (% × total)/100', 'Total = parte×100/%']
+            : ['% = (part/total)×100', 'Part = (% × total)/100', 'Total = part×100/%']
+        },
+        {
+          label: language === 'es' ? '🔢 Calcular %' : '🔢 Calculate %',
+          children: language === 'es'
+            ? ['1. Dividir parte/total', '2. Multiplicar por 100', 'Ej: 25/100 = 25%']
+            : ['1. Divide part/total', '2. Multiply by 100', 'Ex: 25/100 = 25%']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplos' : '✏️ Examples',
+          children: language === 'es'
+            ? ['20% de 150 = 30', '50% = mitad', '25% = cuarto']
+            : ['20% of 150 = 30', '50% = half', '25% = quarter']
+        },
+        {
+          label: language === 'es' ? '📊 Conversiones' : '📊 Conversions',
+          children: language === 'es'
+            ? ['25% = 0.25 = 1/4', '50% = 0.5 = 1/2', '75% = 0.75 = 3/4']
+            : ['25% = 0.25 = 1/4', '50% = 0.5 = 1/2', '75% = 0.75 = 3/4']
+        }
+      ]
+    },
+    'área': {
+      centralLabel: language === 'es' ? 'FÓRMULAS DE ÁREA' : 'AREA FORMULAS',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Cuadrado' : '📐 Square',
+          children: language === 'es'
+            ? ['A = lado²', 'A = l × l', 'Ej: l=5 → A=25']
+            : ['A = side²', 'A = s × s', 'Ex: s=5 → A=25']
+        },
+        {
+          label: language === 'es' ? '📏 Rectángulo' : '📏 Rectangle',
+          children: language === 'es'
+            ? ['A = base × altura', 'A = b × h', 'Ej: 4×6=24']
+            : ['A = base × height', 'A = b × h', 'Ex: 4×6=24']
+        },
+        {
+          label: language === 'es' ? '🔺 Triángulo' : '🔺 Triangle',
+          children: language === 'es'
+            ? ['A = (b × h)/2', 'Mitad del rectángulo', 'Ej: (6×4)/2=12']
+            : ['A = (b × h)/2', 'Half rectangle', 'Ex: (6×4)/2=12']
+        },
+        {
+          label: language === 'es' ? '⭕ Círculo' : '⭕ Circle',
+          children: language === 'es'
+            ? ['A = π × r²', 'π ≈ 3.14159', 'Ej: r=3 → A≈28.27']
+            : ['A = π × r²', 'π ≈ 3.14159', 'Ex: r=3 → A≈28.27']
+        }
+      ]
+    },
+    'perímetro': {
+      centralLabel: language === 'es' ? 'FÓRMULAS DE PERÍMETRO' : 'PERIMETER FORMULAS',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Cuadrado' : '📐 Square',
+          children: language === 'es'
+            ? ['P = 4 × lado', 'P = 4l', 'Ej: l=5 → P=20']
+            : ['P = 4 × side', 'P = 4s', 'Ex: s=5 → P=20']
+        },
+        {
+          label: language === 'es' ? '📏 Rectángulo' : '📏 Rectangle',
+          children: language === 'es'
+            ? ['P = 2(b + h)', 'P = 2b + 2h', 'Ej: 2(4+6)=20']
+            : ['P = 2(b + h)', 'P = 2b + 2h', 'Ex: 2(4+6)=20']
+        },
+        {
+          label: language === 'es' ? '🔺 Triángulo' : '🔺 Triangle',
+          children: language === 'es'
+            ? ['P = a + b + c', 'Suma de lados', 'Ej: 3+4+5=12']
+            : ['P = a + b + c', 'Sum of sides', 'Ex: 3+4+5=12']
+        },
+        {
+          label: language === 'es' ? '⭕ Circunferencia' : '⭕ Circumference',
+          children: language === 'es'
+            ? ['C = 2πr', 'C = πd', 'Ej: r=3 → C≈18.85']
+            : ['C = 2πr', 'C = πd', 'Ex: r=3 → C≈18.85']
+        }
+      ]
+    },
+    'multiplicación': {
+      centralLabel: language === 'es' ? 'MULTIPLICACIÓN a × b' : 'MULTIPLICATION a × b',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Propiedades' : '📐 Properties',
+          children: language === 'es'
+            ? ['Conmutativa: a×b=b×a', 'Asociativa: (a×b)×c', 'Distributiva']
+            : ['Commutative: a×b=b×a', 'Associative: (a×b)×c', 'Distributive']
+        },
+        {
+          label: language === 'es' ? '🔢 Elemento Neutro' : '🔢 Identity Element',
+          children: language === 'es'
+            ? ['a × 1 = a', 'a × 0 = 0', '5 × 1 = 5']
+            : ['a × 1 = a', 'a × 0 = 0', '5 × 1 = 5']
+        },
+        {
+          label: language === 'es' ? '✏️ Tablas Clave' : '✏️ Key Tables',
+          children: language === 'es'
+            ? ['7×8=56', '6×7=42', '8×9=72']
+            : ['7×8=56', '6×7=42', '8×9=72']
+        },
+        {
+          label: language === 'es' ? '📊 Trucos' : '📊 Tricks',
+          children: language === 'es'
+            ? ['×9: dedos', '×5: mitad×10', '×11: suma dígitos']
+            : ['×9: fingers', '×5: half×10', '×11: sum digits']
+        }
+      ]
+    },
+    'división': {
+      centralLabel: language === 'es' ? 'DIVISIÓN a ÷ b = c' : 'DIVISION a ÷ b = c',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Términos' : '📐 Terms',
+          children: language === 'es'
+            ? ['a = dividendo', 'b = divisor', 'c = cociente']
+            : ['a = dividend', 'b = divisor', 'c = quotient']
+        },
+        {
+          label: language === 'es' ? '🔢 Verificación' : '🔢 Verification',
+          children: language === 'es'
+            ? ['D = d × c + r', 'Ej: 17=5×3+2', 'r < divisor']
+            : ['D = d × q + r', 'Ex: 17=5×3+2', 'r < divisor']
+        },
+        {
+          label: language === 'es' ? '✏️ División Exacta' : '✏️ Exact Division',
+          children: language === 'es'
+            ? ['Resto = 0', '20 ÷ 4 = 5', 'Sin residuo']
+            : ['Remainder = 0', '20 ÷ 4 = 5', 'No remainder']
+        },
+        {
+          label: language === 'es' ? '⚠️ Regla' : '⚠️ Rule',
+          children: language === 'es'
+            ? ['No dividir por 0', '÷1 = mismo número', '÷ sí mismo = 1']
+            : ["Can't divide by 0", '÷1 = same number', '÷ itself = 1']
+        }
+      ]
+    },
+    'números enteros': {
+      centralLabel: language === 'es' ? 'NÚMEROS ENTEROS ℤ' : 'INTEGERS ℤ',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Definición' : '📐 Definition',
+          children: language === 'es'
+            ? ['ℤ = {...-2,-1,0,1,2...}', 'Positivos: +', 'Negativos: -']
+            : ['ℤ = {...-2,-1,0,1,2...}', 'Positive: +', 'Negative: -']
+        },
+        {
+          label: language === 'es' ? '➕ Suma' : '➕ Addition',
+          children: language === 'es'
+            ? ['(+)+(+) = +', '(-)+(-)  = -', 'Signos ≠: restar']
+            : ['(+)+(+) = +', '(-)+(-)  = -', 'Diff signs: subtract']
+        },
+        {
+          label: language === 'es' ? '✖️ Multiplicación' : '✖️ Multiplication',
+          children: language === 'es'
+            ? ['(+)×(+) = +', '(-)×(-) = +', '(+)×(-) = -']
+            : ['(+)×(+) = +', '(-)×(-) = +', '(+)×(-) = -']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplos' : '✏️ Examples',
+          children: language === 'es'
+            ? ['(-3)+(-5)=-8', '(-4)×(-2)=+8', '(-6)÷(+3)=-2']
+            : ['(-3)+(-5)=-8', '(-4)×(-2)=+8', '(-6)÷(+3)=-2']
+        }
+      ]
+    },
+    'álgebra': {
+      centralLabel: language === 'es' ? 'ÁLGEBRA BÁSICA' : 'BASIC ALGEBRA',
+      branches: [
+        {
+          label: language === 'es' ? '📐 Expresiones' : '📐 Expressions',
+          children: language === 'es'
+            ? ['Variable: x, y', 'Constante: números', 'Coeficiente: 3x']
+            : ['Variable: x, y', 'Constant: numbers', 'Coefficient: 3x']
+        },
+        {
+          label: language === 'es' ? '🔢 Ecuaciones' : '🔢 Equations',
+          children: language === 'es'
+            ? ['ax + b = c', 'Despejar x', 'x = (c-b)/a']
+            : ['ax + b = c', 'Solve for x', 'x = (c-b)/a']
+        },
+        {
+          label: language === 'es' ? '✏️ Ejemplo' : '✏️ Example',
+          children: language === 'es'
+            ? ['2x + 3 = 11', '2x = 11 - 3 = 8', 'x = 8/2 = 4']
+            : ['2x + 3 = 11', '2x = 11 - 3 = 8', 'x = 8/2 = 4']
+        },
+        {
+          label: language === 'es' ? '📊 Productos' : '📊 Products',
+          children: language === 'es'
+            ? ['(a+b)² = a²+2ab+b²', '(a-b)² = a²-2ab+b²', '(a+b)(a-b) = a²-b²']
+            : ['(a+b)² = a²+2ab+b²', '(a-b)² = a²-2ab+b²', '(a+b)(a-b) = a²-b²']
+        }
+      ]
+    },
+    // =====================================================================
+    // TRUCOS RÁPIDOS DE MATEMÁTICAS - PARA NIÑOS DE 1RO BÁSICO
+    // =====================================================================
+    'trucos': {
+      centralLabel: language === 'es' ? 'TRUCOS RÁPIDOS ✨' : 'QUICK TRICKS ✨',
+      branches: [
+        {
+          label: language === 'es' ? '0️⃣ Sumar Cero' : '0️⃣ Add Zero',
+          children: language === 'es'
+            ? ['5 + 0 = 5', '0 + 3 = 3', '¡No cambia!']
+            : ['5 + 0 = 5', '0 + 3 = 3', 'No change!']
+        },
+        {
+          label: language === 'es' ? '🔟 Formar 10' : '🔟 Make 10',
+          children: language === 'es'
+            ? ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+            : ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+        },
+        {
+          label: language === 'es' ? '👯 Dobles' : '👯 Doubles',
+          children: language === 'es'
+            ? ['2 + 2 = 4', '5 + 5 = 10', '4 + 4 = 8']
+            : ['2 + 2 = 4', '5 + 5 = 10', '4 + 4 = 8']
+        },
+        {
+          label: language === 'es' ? '🖐️ Usa Dedos' : '🖐️ Use Fingers',
+          children: language === 'es'
+            ? ['3 + 2 = 5 ✋', '4 + 3 = 7', '¡Cuenta!']
+            : ['3 + 2 = 5 ✋', '4 + 3 = 7', 'Count!']
+        },
+        {
+          label: language === 'es' ? '➕ Sumar 1' : '➕ Add 1',
+          children: language === 'es'
+            ? ['5 + 1 = 6', '9 + 1 = 10', '¡El siguiente!']
+            : ['5 + 1 = 6', '9 + 1 = 10', 'The next one!']
+        }
+      ]
+    },
+    'trucos rápidos': {
+      centralLabel: language === 'es' ? 'TRUCOS RÁPIDOS ✨' : 'QUICK TRICKS ✨',
+      branches: [
+        {
+          label: language === 'es' ? '0️⃣ Sumar Cero' : '0️⃣ Add Zero',
+          children: language === 'es'
+            ? ['5 + 0 = 5', '0 + 3 = 3', '¡No cambia!']
+            : ['5 + 0 = 5', '0 + 3 = 3', 'No change!']
+        },
+        {
+          label: language === 'es' ? '🔟 Formar 10' : '🔟 Make 10',
+          children: language === 'es'
+            ? ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+            : ['7 + 3 = 10', '8 + 2 = 10', '6 + 4 = 10']
+        },
+        {
+          label: language === 'es' ? '👯 Dobles' : '👯 Doubles',
+          children: language === 'es'
+            ? ['2 + 2 = 4', '5 + 5 = 10', '4 + 4 = 8']
+            : ['2 + 2 = 4', '5 + 5 = 10', '4 + 4 = 8']
+        },
+        {
+          label: language === 'es' ? '🖐️ Usa Dedos' : '🖐️ Use Fingers',
+          children: language === 'es'
+            ? ['3 + 2 = 5 ✋', '4 + 3 = 7', '¡Cuenta!']
+            : ['3 + 2 = 5 ✋', '4 + 3 = 7', 'Count!']
+        },
+        {
+          label: language === 'es' ? '➕ Sumar 1' : '➕ Add 1',
+          children: language === 'es'
+            ? ['5 + 1 = 6', '9 + 1 = 10', '¡El siguiente!']
+            : ['5 + 1 = 6', '9 + 1 = 10', 'The next one!']
+        }
+      ]
+    },
+    'trucos matemáticos': {
+      centralLabel: language === 'es' ? 'TRUCOS MATEMÁTICOS' : 'MATH TRICKS',
+      branches: [
+        {
+          label: language === 'es' ? '➕ Sumas' : '➕ Addition',
+          children: language === 'es'
+            ? ['n+0=n', 'Der. a izq.', 'Completar 10s']
+            : ['n+0=n', 'Right to left', 'Complete 10s']
+        },
+        {
+          label: language === 'es' ? '➖ Restas' : '➖ Subtraction',
+          children: language === 'es'
+            ? ['n-0=n', 'Prestar decenas', '100-37=63']
+            : ['n-0=n', 'Borrow tens', '100-37=63']
+        },
+        {
+          label: language === 'es' ? '✖️ Multiplicar' : '✖️ Multiply',
+          children: language === 'es'
+            ? ['×10: añadir 0', '×5: mitad×10', '×11: suma dígitos']
+            : ['×10: add 0', '×5: half×10', '×11: sum digits']
+        },
+        {
+          label: language === 'es' ? '➗ Dividir' : '➗ Divide',
+          children: language === 'es'
+            ? ['÷2: mitad', '÷10: quitar 0', '÷5: ×2÷10']
+            : ['÷2: half', '÷10: remove 0', '÷5: ×2÷10']
+        },
+        {
+          label: language === 'es' ? '🧠 Cálculo Mental' : '🧠 Mental Math',
+          children: language === 'es'
+            ? ['Descomponer', '25×4=100', '8×7: 8×7=56']
+            : ['Decompose', '25×4=100', '8×7: 8×7=56']
+        }
+      ]
+    },
+    'cálculo mental': {
+      centralLabel: language === 'es' ? 'CÁLCULO MENTAL' : 'MENTAL MATH',
+      branches: [
+        {
+          label: language === 'es' ? '➕ Sumar Fácil' : '➕ Easy Addition',
+          children: language === 'es'
+            ? ['Der. a izq.', 'Completar 10', '99+47: 100+46']
+            : ['Right to left', 'Complete 10', '99+47: 100+46']
+        },
+        {
+          label: language === 'es' ? '➖ Restar Fácil' : '➖ Easy Subtraction',
+          children: language === 'es'
+            ? ['Contar hacia arriba', '100-63: 63+?=100', 'Prestando: 52-28']
+            : ['Count up', '100-63: 63+?=100', 'Borrowing: 52-28']
+        },
+        {
+          label: language === 'es' ? '✖️ Multiplicar Fácil' : '✖️ Easy Multiply',
+          children: language === 'es'
+            ? ['×9: dedos', '×5: ÷2×10', '×25: ÷4×100']
+            : ['×9: fingers', '×5: ÷2×10', '×25: ÷4×100']
+        },
+        {
+          label: language === 'es' ? '🎯 Números Amigos' : '🎯 Friendly Numbers',
+          children: language === 'es'
+            ? ['Suman 10: 7+3', 'Suman 100: 75+25', '×que dan 100']
+            : ['Sum 10: 7+3', 'Sum 100: 75+25', '× give 100']
+        },
+        {
+          label: language === 'es' ? '💡 Patrones' : '💡 Patterns',
+          children: language === 'es'
+            ? ['×11: 23×11=253', '×9: suma=9', 'Cuadrados: 5²=25']
+            : ['×11: 23×11=253', '×9: sum=9', 'Squares: 5²=25']
+        }
+      ]
+    }
+  };
+  
+  // Buscar tema en mapeos
+  let structure = mathTopicMappings[centralTheme];
+  
+  if (!structure) {
+    // Buscar coincidencias parciales
+    for (const [key, value] of Object.entries(mathTopicMappings)) {
+      if (centralTheme.includes(key) || key.includes(centralTheme)) {
+        structure = value;
+        break;
+      }
+    }
+  }
+  
+  if (!structure) {
+    // Fallback genérico para matemáticas - CON CONTENIDO ÚTIL
+    const themeUpper = input.centralTheme.toUpperCase();
+    structure = {
+      centralLabel: themeUpper,
+      branches: [
+        {
+          label: language === 'es' ? '📐 Concepto' : '📐 Concept',
+          children: language === 'es' 
+            ? [`Qué es ${input.centralTheme}`, 'Elementos clave', 'Notación: símbolos']
+            : [`What is ${input.centralTheme}`, 'Key elements', 'Notation: symbols']
+        },
+        {
+          label: language === 'es' ? '🔢 Fórmulas' : '🔢 Formulas',
+          children: language === 'es'
+            ? ['Fórmula principal', 'Fórmulas derivadas', 'Variables: a, b, x']
+            : ['Main formula', 'Derived formulas', 'Variables: a, b, x']
+        },
+        {
+          label: language === 'es' ? '✏️ Procedimiento' : '✏️ Procedure',
+          children: language === 'es'
+            ? ['1. Identificar datos', '2. Aplicar fórmula', '3. Calcular resultado']
+            : ['1. Identify data', '2. Apply formula', '3. Calculate result']
+        },
+        {
+          label: language === 'es' ? '📊 Ejercicio' : '📊 Exercise',
+          children: language === 'es'
+            ? ['Datos: valores', 'Desarrollo: pasos', 'Resultado: respuesta']
+            : ['Data: values', 'Development: steps', 'Result: answer']
+        }
+      ]
+    };
+  }
+  
+  return {
+    centralThemeLabel: structure.centralLabel.toUpperCase(),
+    mainBranches: structure.branches.map(branch => ({
+      label: branch.label,
+      children: branch.children.map(child => ({ label: child }))
+    }))
+  };
+}
+
+/**
+ * Genera SVG especializado para mapas mentales de matemáticas
+ * Usa colores y estilos optimizados para fórmulas y ejercicios
+ */
+function generateMathSvg(structure: MindMapStructure, isHorizontal?: boolean): string {
+  const width = isHorizontal ? 1500 : 1100;
+  const height = isHorizontal ? 850 : 1300;
+  
+  // Paleta de colores especial para matemáticas - tonos azules/verdes profesionales
+  const mathColorScheme = [
+    '#1e40af', // Central - azul oscuro (matemáticas)
+    '#7c3aed', // Rama 1 - violeta (fórmulas)
+    '#059669', // Rama 2 - verde esmeralda (procedimientos)
+    '#dc2626', // Rama 3 - rojo (ejemplos)
+    '#ea580c', // Rama 4 - naranja (aplicaciones)
+    '#0891b2', // Rama 5 - cyan
+    '#6366f1', // Subnodos - índigo
+    '#8b5cf6', // Subnodos alternativo
+    '#10b981', // Verde claro
+    '#f59e0b'  // Amarillo dorado
+  ];
+  
+  const colors = {
+    background: '#f8fafc',
+    text: '#ffffff',
+    darkText: '#1e293b',
+    line: '#64748b',
+    mathBg: '#e0e7ff', // Fondo claro para fórmulas
+    shadow: 'rgba(0,0,0,0.12)'
+  };
+  
+  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 ${width} ${height}" style="background: ${colors.background};">
+    
+    <defs>
+      <filter id="mathShadow" x="-25%" y="-25%" width="150%" height="150%">
+        <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="${colors.shadow}" flood-opacity="0.4"/>
+      </filter>
+      
+      <!-- Gradiente especial para nodo central matemático -->
+      <linearGradient id="mathCentralGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+      </linearGradient>
+      
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;display=swap');
+        
+        .math-text { 
+          font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace; 
+          text-anchor: middle; 
+          dominant-baseline: middle; 
+          font-weight: 500;
+          letter-spacing: 0.2px;
+        }
+        .central-text { fill: ${colors.text}; font-size: 20px; font-weight: 700; }
+        .branch-text { fill: ${colors.text}; font-size: 14px; font-weight: 600; }
+        .sub-text { fill: ${colors.text}; font-size: 12px; font-weight: 500; }
+        .formula-text { 
+          font-family: 'JetBrains Mono', 'Consolas', monospace; 
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .math-line { 
+          stroke: ${colors.line}; 
+          stroke-width: 2.5; 
+          stroke-linecap: round;
+          stroke-dasharray: none;
+          opacity: 0.7;
+        }
+      </style>
+    </defs>
+    
+    <!-- Decoración de fondo matemático -->
+    <text x="50" y="50" fill="#e2e8f0" font-size="80" opacity="0.3">∑</text>
+    <text x="${width - 100}" y="${height - 50}" fill="#e2e8f0" font-size="70" opacity="0.3">π</text>
+    <text x="${width - 80}" y="80" fill="#e2e8f0" font-size="60" opacity="0.25">∞</text>
+    <text x="40" y="${height - 80}" fill="#e2e8f0" font-size="65" opacity="0.25">√</text>
+    `;
+
+  if (isHorizontal) {
+    // DISEÑO HORIZONTAL PARA MATEMÁTICAS
+    const centerX = 200;
+    const centerY = height / 2;
+    const centralW = 200;
+    const centralH = 90;
+    const branches = structure.mainBranches;
+    
+    const branchSpacing = Math.max(130, (height - 150) / branches.length);
+    const branchStartY = centerY - ((branches.length - 1) * branchSpacing / 2);
+    
+    // Líneas de conexión
+    branches.forEach((branch, idx) => {
+      const branchY = branchStartY + (idx * branchSpacing);
+      const branchX = centerX + 340;
+      
+      svg += `<line x1="${centerX + centralW/2}" y1="${centerY}" 
+        x2="${branchX - 90}" y2="${branchY}" class="math-line"/>`;
+      
+      if (branch.children && branch.children.length > 0) {
+        const subStartX = branchX + 240;
+        const subSpacing = Math.max(150, 450 / branch.children.length);
+        
+        branch.children.forEach((child: MindMapNode, childIdx: number) => {
+          const subX = subStartX + (childIdx * subSpacing);
+          svg += `<line x1="${branchX + 90}" y1="${branchY}" 
+            x2="${subX - 55}" y2="${branchY}" class="math-line"/>`;
+        });
+      }
+    });
+    
+    // Nodo central con gradiente matemático
+    svg += `<rect x="${centerX - centralW/2}" y="${centerY - centralH/2}" 
+      width="${centralW}" height="${centralH}" rx="20" 
+      fill="url(#mathCentralGradient)" stroke="${mathColorScheme[0]}" stroke-width="3" filter="url(#mathShadow)"/>`;
+    
+    // Ícono matemático en el centro
+    svg += `<text x="${centerX - centralW/2 + 25}" y="${centerY}" fill="white" font-size="24" opacity="0.8">∑</text>`;
+    
+    const centralLines = intelligentTextWrap(structure.centralThemeLabel, 18);
+    const centralStartY = centerY - ((centralLines.length - 1) * 22 / 2);
+    centralLines.forEach((line: string, idx: number) => {
+      svg += `<text x="${centerX + 10}" y="${centralStartY + (idx * 22)}" class="math-text central-text">${escapeXml(line)}</text>`;
+    });
+    
+    // Ramas y subnodos
+    branches.forEach((branch, idx) => {
+      const branchY = branchStartY + (idx * branchSpacing);
+      const branchX = centerX + 340;
+      const branchW = 180;
+      const branchH = 65;
+      const branchColor = mathColorScheme[idx + 1] || mathColorScheme[1];
+      
+      svg += `<rect x="${branchX - branchW/2}" y="${branchY - branchH/2}" 
+        width="${branchW}" height="${branchH}" rx="15" 
+        fill="${branchColor}" stroke="none" filter="url(#mathShadow)"/>`;
+      
+      const branchLines = intelligentTextWrap(branch.label, 20);
+      const branchTextStartY = branchY - ((branchLines.length - 1) * 18 / 2);
+      branchLines.forEach((line: string, lineIdx: number) => {
+        svg += `<text x="${branchX}" y="${branchTextStartY + (lineIdx * 18)}" class="math-text branch-text">${escapeXml(line)}</text>`;
+      });
+      
+      // Subnodos para fórmulas y ejercicios
+      if (branch.children && branch.children.length > 0) {
+        const subStartX = branchX + 240;
+        const subSpacing = Math.max(150, 450 / branch.children.length);
+        
+        branch.children.forEach((child: MindMapNode, childIdx: number) => {
+          const subX = subStartX + (childIdx * subSpacing);
+          const subRadius = 55;
+          const subColor = mathColorScheme[6 + (childIdx % 2)];
+          
+          svg += `<circle cx="${subX}" cy="${branchY}" r="${subRadius}" 
+            fill="${subColor}" stroke="none" filter="url(#mathShadow)"/>`;
+          
+          const subLines = intelligentTextWrap(child.label, 14);
+          const lineHeight = 15;
+          const totalTextHeight = (subLines.length - 1) * lineHeight;
+          const subTextStartY = branchY - (totalTextHeight / 2);
+          subLines.forEach((line: string, lineIdx: number) => {
+            const yPosition = subTextStartY + (lineIdx * lineHeight);
+            svg += `<text x="${subX}" y="${yPosition}" class="math-text formula-text" fill="white">${escapeXml(line)}</text>`;
+          });
+        });
+      }
+    });
+    
+  } else {
+    // DISEÑO VERTICAL PARA MATEMÁTICAS
+    const centerX = width / 2;
+    const startY = 130;
+    const centralR = 90;
+    const branches = structure.mainBranches;
+    
+    const branchY = startY + 280;
+    const totalBranchWidth = Math.min(width - 140, branches.length * 220);
+    const branchStartX = centerX - (totalBranchWidth / 2);
+    const branchSpacing = totalBranchWidth / branches.length;
+    
+    // Líneas de conexión
+    branches.forEach((branch, idx) => {
+      const branchX = branchStartX + (idx + 0.5) * branchSpacing;
+      
+      svg += `<line x1="${centerX}" y1="${startY + centralR}" 
+        x2="${branchX}" y2="${branchY - 40}" class="math-line"/>`;
+      
+      if (branch.children && branch.children.length > 0) {
+        const subStartY = branchY + 160;
+        const subSpacing = 110;
+        
+        branch.children.forEach((child: MindMapNode, childIdx: number) => {
+          const subY = subStartY + (childIdx * subSpacing);
+          svg += `<line x1="${branchX}" y1="${branchY + 40}" 
+            x2="${branchX}" y2="${subY - 55}" class="math-line"/>`;
+        });
+      }
+    });
+    
+    // Nodo central matemático
+    svg += `<circle cx="${centerX}" cy="${startY}" r="${centralR}" 
+      fill="url(#mathCentralGradient)" stroke="${mathColorScheme[0]}" stroke-width="4" filter="url(#mathShadow)"/>`;
+    
+    // Símbolo matemático decorativo
+    svg += `<text x="${centerX}" y="${startY - 35}" fill="white" font-size="28" text-anchor="middle" opacity="0.9">∑</text>`;
+    
+    const centralLines = intelligentTextWrap(structure.centralThemeLabel, 16);
+    const centralTextY = startY + 10 - ((centralLines.length - 1) * 22 / 2);
+    centralLines.forEach((line: string, idx: number) => {
+      svg += `<text x="${centerX}" y="${centralTextY + (idx * 22)}" class="math-text central-text" 
+        style="font-size: 19px;">${escapeXml(line)}</text>`;
+    });
+    
+    // Ramas principales
+    branches.forEach((branch, idx) => {
+      const branchX = branchStartX + (idx + 0.5) * branchSpacing;
+      const branchW = 185;
+      const branchH = 75;
+      const branchColor = mathColorScheme[idx + 1] || mathColorScheme[1];
+      
+      svg += `<rect x="${branchX - branchW/2}" y="${branchY - branchH/2}" 
+        width="${branchW}" height="${branchH}" rx="18" 
+        fill="${branchColor}" stroke="none" filter="url(#mathShadow)"/>`;
+      
+      const branchLines = intelligentTextWrap(branch.label, 20);
+      const branchTextY = branchY - ((branchLines.length - 1) * 18 / 2);
+      branchLines.forEach((line: string, lineIdx: number) => {
+        svg += `<text x="${branchX}" y="${branchTextY + (lineIdx * 18)}" class="math-text branch-text" 
+          style="font-size: 15px;">${escapeXml(line)}</text>`;
+      });
+      
+      // Subnodos con fórmulas
+      if (branch.children && branch.children.length > 0) {
+        const subStartY = branchY + 160;
+        const subSpacing = 110;
+        
+        branch.children.forEach((child: MindMapNode, childIdx: number) => {
+          const subY = subStartY + (childIdx * subSpacing);
+          const subR = 55;
+          const subColor = mathColorScheme[6 + (childIdx % 2)];
+          
+          svg += `<circle cx="${branchX}" cy="${subY}" r="${subR}" 
+            fill="${subColor}" stroke="none" filter="url(#mathShadow)"/>`;
+          
+          const subLines = intelligentTextWrap(child.label, 14);
+          const lineHeight = 15;
+          const totalTextHeight = (subLines.length - 1) * lineHeight;
+          const subTextY = subY - (totalTextHeight / 2);
+          subLines.forEach((line: string, lineIdx: number) => {
+            const yPosition = subTextY + (lineIdx * lineHeight);
+            svg += `<text x="${branchX}" y="${yPosition}" class="math-text formula-text" 
+              fill="white" text-anchor="middle" dominant-baseline="middle">${escapeXml(line)}</text>`;
+          });
+        });
+      }
+    });
+  }
+  
+  svg += '</svg>';
+  return svg;
+}
+
+/**
+ * Escapa caracteres especiales para XML/SVG
+ */
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
