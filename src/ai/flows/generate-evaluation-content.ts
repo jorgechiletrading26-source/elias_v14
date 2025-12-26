@@ -909,36 +909,155 @@ Respond ONLY with JSON, no additional text.`;
         let answer = true;
         let explanation = '';
         
-        // MATEMÁTICAS: Generar problemas con operaciones
+        // MATEMÁTICAS: Generar problemas específicos del tema seleccionado
         if (isMathSubject) {
-          // Banco de problemas matemáticos V/F
-          const mathTrueFalseProblems = [
-            // Operaciones correctas (verdaderas)
-            { q: 'El resultado de 15 + 27 es igual a 42', a: true, e: '15 + 27 = 42. La suma es correcta.' },
-            { q: 'El resultado de 8 × 7 es igual a 56', a: true, e: '8 × 7 = 56. La multiplicación es correcta.' },
+          // Normalizar el tema para detectar qué tipo de matemáticas es
+          const mathTopic = input.topic.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          
+          // Bancos de preguntas V/F por tema específico
+          const divisionProblems = [
+            { q: 'El resultado de 72 ÷ 8 es igual a 9', a: true, e: '72 ÷ 8 = 9. La división es correcta.' },
             { q: 'El resultado de 144 ÷ 12 es igual a 12', a: true, e: '144 ÷ 12 = 12. La división es correcta.' },
-            { q: 'El resultado de 100 - 37 es igual a 63', a: true, e: '100 - 37 = 63. La resta es correcta.' },
-            { q: 'Si 4x = 20, entonces x = 5', a: true, e: 'Para encontrar x: x = 20 ÷ 4 = 5.' },
-            { q: 'El resultado de 3² + 4² es igual a 25', a: true, e: '3² + 4² = 9 + 16 = 25. Es el teorema de Pitágoras para 3-4-5.' },
-            { q: 'La mitad de 84 es 42', a: true, e: '84 ÷ 2 = 42. La división es correcta.' },
-            { q: 'El doble de 35 es 70', a: true, e: '35 × 2 = 70. La multiplicación es correcta.' },
-            { q: 'El resultado de 25% de 80 es 20', a: true, e: '25% de 80 = 80 × 0.25 = 20.' },
-            { q: 'El resultado de 1/2 + 1/4 es igual a 3/4', a: true, e: '1/2 + 1/4 = 2/4 + 1/4 = 3/4.' },
-            // Operaciones incorrectas (falsas)
-            { q: 'El resultado de 9 × 8 es igual a 63', a: false, e: '9 × 8 = 72, no 63.' },
+            { q: 'El resultado de 81 ÷ 9 es igual a 9', a: true, e: '81 ÷ 9 = 9. La división es correcta.' },
+            { q: 'El resultado de 100 ÷ 25 es igual a 4', a: true, e: '100 ÷ 25 = 4. La división es correcta.' },
+            { q: 'El resultado de 63 ÷ 7 es igual a 9', a: true, e: '63 ÷ 7 = 9. La división es correcta.' },
+            { q: 'El resultado de 120 ÷ 10 es igual a 12', a: true, e: '120 ÷ 10 = 12. La división es correcta.' },
             { q: 'El resultado de 56 ÷ 7 es igual a 9', a: false, e: '56 ÷ 7 = 8, no 9.' },
-            { q: 'El resultado de 45 + 38 es igual a 73', a: false, e: '45 + 38 = 83, no 73.' },
-            { q: 'Si 5x = 30, entonces x = 7', a: false, e: 'Si 5x = 30, entonces x = 30 ÷ 5 = 6, no 7.' },
-            { q: 'El resultado de 2³ es igual a 6', a: false, e: '2³ = 2 × 2 × 2 = 8, no 6.' },
-            { q: 'El 50% de 60 es 25', a: false, e: '50% de 60 = 60 × 0.5 = 30, no 25.' },
-            { q: 'El triple de 15 es 50', a: false, e: '15 × 3 = 45, no 50.' },
-            { q: 'El resultado de 1/3 + 1/3 es igual a 2/6', a: false, e: '1/3 + 1/3 = 2/3, no 2/6.' },
-            { q: 'El cuadrado de 7 es 45', a: false, e: '7² = 7 × 7 = 49, no 45.' },
-            { q: 'El resultado de 120 - 85 es igual a 45', a: false, e: '120 - 85 = 35, no 45.' }
+            { q: 'El resultado de 48 ÷ 6 es igual a 7', a: false, e: '48 ÷ 6 = 8, no 7.' },
+            { q: 'El resultado de 90 ÷ 9 es igual a 11', a: false, e: '90 ÷ 9 = 10, no 11.' },
+            { q: 'El resultado de 84 ÷ 7 es igual a 11', a: false, e: '84 ÷ 7 = 12, no 11.' },
+            { q: 'El resultado de 150 ÷ 15 es igual a 12', a: false, e: '150 ÷ 15 = 10, no 12.' },
+            { q: 'El resultado de 96 ÷ 8 es igual a 11', a: false, e: '96 ÷ 8 = 12, no 11.' }
           ];
           
-          const problem = mathTrueFalseProblems[index % mathTrueFalseProblems.length];
-          question = isEs ? problem.q : problem.q.replace('El resultado de', 'The result of').replace('es igual a', 'equals').replace('entonces', 'then').replace('La mitad de', 'Half of').replace('El doble de', 'Double of').replace('El triple de', 'Triple of').replace('El cuadrado de', 'The square of');
+          const multiplicationProblems = [
+            { q: 'El resultado de 8 × 7 es igual a 56', a: true, e: '8 × 7 = 56. La multiplicación es correcta.' },
+            { q: 'El resultado de 9 × 6 es igual a 54', a: true, e: '9 × 6 = 54. La multiplicación es correcta.' },
+            { q: 'El resultado de 12 × 5 es igual a 60', a: true, e: '12 × 5 = 60. La multiplicación es correcta.' },
+            { q: 'El resultado de 7 × 7 es igual a 49', a: true, e: '7 × 7 = 49. La multiplicación es correcta.' },
+            { q: 'El resultado de 11 × 8 es igual a 88', a: true, e: '11 × 8 = 88. La multiplicación es correcta.' },
+            { q: 'El resultado de 6 × 9 es igual a 54', a: true, e: '6 × 9 = 54. La multiplicación es correcta.' },
+            { q: 'El resultado de 9 × 8 es igual a 63', a: false, e: '9 × 8 = 72, no 63.' },
+            { q: 'El resultado de 7 × 6 es igual a 48', a: false, e: '7 × 6 = 42, no 48.' },
+            { q: 'El resultado de 8 × 8 es igual a 62', a: false, e: '8 × 8 = 64, no 62.' },
+            { q: 'El resultado de 12 × 7 es igual a 82', a: false, e: '12 × 7 = 84, no 82.' },
+            { q: 'El resultado de 9 × 9 es igual a 72', a: false, e: '9 × 9 = 81, no 72.' },
+            { q: 'El resultado de 6 × 8 es igual a 46', a: false, e: '6 × 8 = 48, no 46.' }
+          ];
+          
+          const additionProblems = [
+            { q: 'El resultado de 15 + 27 es igual a 42', a: true, e: '15 + 27 = 42. La suma es correcta.' },
+            { q: 'El resultado de 38 + 45 es igual a 83', a: true, e: '38 + 45 = 83. La suma es correcta.' },
+            { q: 'El resultado de 67 + 28 es igual a 95', a: true, e: '67 + 28 = 95. La suma es correcta.' },
+            { q: 'El resultado de 156 + 89 es igual a 245', a: true, e: '156 + 89 = 245. La suma es correcta.' },
+            { q: 'El resultado de 234 + 178 es igual a 412', a: true, e: '234 + 178 = 412. La suma es correcta.' },
+            { q: 'El resultado de 99 + 56 es igual a 155', a: true, e: '99 + 56 = 155. La suma es correcta.' },
+            { q: 'El resultado de 45 + 38 es igual a 73', a: false, e: '45 + 38 = 83, no 73.' },
+            { q: 'El resultado de 67 + 45 es igual a 102', a: false, e: '67 + 45 = 112, no 102.' },
+            { q: 'El resultado de 89 + 34 es igual a 113', a: false, e: '89 + 34 = 123, no 113.' },
+            { q: 'El resultado de 125 + 78 es igual a 193', a: false, e: '125 + 78 = 203, no 193.' },
+            { q: 'El resultado de 56 + 67 es igual a 113', a: false, e: '56 + 67 = 123, no 113.' },
+            { q: 'El resultado de 145 + 89 es igual a 224', a: false, e: '145 + 89 = 234, no 224.' }
+          ];
+          
+          const subtractionProblems = [
+            { q: 'El resultado de 100 - 37 es igual a 63', a: true, e: '100 - 37 = 63. La resta es correcta.' },
+            { q: 'El resultado de 85 - 48 es igual a 37', a: true, e: '85 - 48 = 37. La resta es correcta.' },
+            { q: 'El resultado de 156 - 89 es igual a 67', a: true, e: '156 - 89 = 67. La resta es correcta.' },
+            { q: 'El resultado de 200 - 125 es igual a 75', a: true, e: '200 - 125 = 75. La resta es correcta.' },
+            { q: 'El resultado de 93 - 46 es igual a 47', a: true, e: '93 - 46 = 47. La resta es correcta.' },
+            { q: 'El resultado de 178 - 89 es igual a 89', a: true, e: '178 - 89 = 89. La resta es correcta.' },
+            { q: 'El resultado de 120 - 85 es igual a 45', a: false, e: '120 - 85 = 35, no 45.' },
+            { q: 'El resultado de 95 - 38 es igual a 67', a: false, e: '95 - 38 = 57, no 67.' },
+            { q: 'El resultado de 143 - 76 es igual a 77', a: false, e: '143 - 76 = 67, no 77.' },
+            { q: 'El resultado de 200 - 87 es igual a 123', a: false, e: '200 - 87 = 113, no 123.' },
+            { q: 'El resultado de 167 - 89 es igual a 88', a: false, e: '167 - 89 = 78, no 88.' },
+            { q: 'El resultado de 134 - 67 es igual a 77', a: false, e: '134 - 67 = 67, no 77.' }
+          ];
+          
+          const fractionProblems = [
+            { q: 'El resultado de 1/2 + 1/4 es igual a 3/4', a: true, e: '1/2 + 1/4 = 2/4 + 1/4 = 3/4.' },
+            { q: 'El resultado de 2/3 + 1/3 es igual a 1', a: true, e: '2/3 + 1/3 = 3/3 = 1.' },
+            { q: 'El resultado de 3/4 - 1/4 es igual a 1/2', a: true, e: '3/4 - 1/4 = 2/4 = 1/2.' },
+            { q: 'El resultado de 1/2 × 1/2 es igual a 1/4', a: true, e: '1/2 × 1/2 = 1/4.' },
+            { q: 'El resultado de 2/5 + 2/5 es igual a 4/5', a: true, e: '2/5 + 2/5 = 4/5.' },
+            { q: 'Las fracciones 2/4 y 1/2 son equivalentes', a: true, e: '2/4 simplificado es 1/2, son equivalentes.' },
+            { q: 'El resultado de 1/3 + 1/3 es igual a 2/6', a: false, e: '1/3 + 1/3 = 2/3, no 2/6.' },
+            { q: 'El resultado de 1/4 + 1/4 es igual a 1/2', a: true, e: '1/4 + 1/4 = 2/4 = 1/2.' },
+            { q: 'El resultado de 3/5 - 1/5 es igual a 1/5', a: false, e: '3/5 - 1/5 = 2/5, no 1/5.' },
+            { q: 'Las fracciones 3/6 y 2/4 son equivalentes', a: true, e: 'Ambas equivalen a 1/2.' },
+            { q: 'El resultado de 1/2 ÷ 2 es igual a 1', a: false, e: '1/2 ÷ 2 = 1/4, no 1.' },
+            { q: 'El resultado de 2/3 × 3 es igual a 3', a: false, e: '2/3 × 3 = 2, no 3.' }
+          ];
+          
+          const percentageProblems = [
+            { q: 'El 25% de 80 es igual a 20', a: true, e: '25% de 80 = 80 × 0.25 = 20.' },
+            { q: 'El 50% de 60 es igual a 30', a: true, e: '50% de 60 = 60 × 0.5 = 30.' },
+            { q: 'El 10% de 150 es igual a 15', a: true, e: '10% de 150 = 150 × 0.1 = 15.' },
+            { q: 'El 75% de 40 es igual a 30', a: true, e: '75% de 40 = 40 × 0.75 = 30.' },
+            { q: 'El 20% de 200 es igual a 40', a: true, e: '20% de 200 = 200 × 0.2 = 40.' },
+            { q: 'El 100% de 45 es igual a 45', a: true, e: '100% de cualquier número es el mismo número.' },
+            { q: 'El 50% de 60 es igual a 25', a: false, e: '50% de 60 = 30, no 25.' },
+            { q: 'El 25% de 100 es igual a 30', a: false, e: '25% de 100 = 25, no 30.' },
+            { q: 'El 10% de 200 es igual a 30', a: false, e: '10% de 200 = 20, no 30.' },
+            { q: 'El 75% de 100 es igual a 80', a: false, e: '75% de 100 = 75, no 80.' },
+            { q: 'El 20% de 50 es igual a 15', a: false, e: '20% de 50 = 10, no 15.' },
+            { q: 'El 30% de 90 es igual a 30', a: false, e: '30% de 90 = 27, no 30.' }
+          ];
+          
+          const equationProblems = [
+            { q: 'Si 4x = 20, entonces x = 5', a: true, e: 'x = 20 ÷ 4 = 5.' },
+            { q: 'Si 3x = 15, entonces x = 5', a: true, e: 'x = 15 ÷ 3 = 5.' },
+            { q: 'Si x + 7 = 12, entonces x = 5', a: true, e: 'x = 12 - 7 = 5.' },
+            { q: 'Si 2x + 4 = 10, entonces x = 3', a: true, e: '2x = 6, x = 3.' },
+            { q: 'Si x - 8 = 15, entonces x = 23', a: true, e: 'x = 15 + 8 = 23.' },
+            { q: 'Si 5x = 45, entonces x = 9', a: true, e: 'x = 45 ÷ 5 = 9.' },
+            { q: 'Si 5x = 30, entonces x = 7', a: false, e: 'x = 30 ÷ 5 = 6, no 7.' },
+            { q: 'Si x + 9 = 20, entonces x = 12', a: false, e: 'x = 20 - 9 = 11, no 12.' },
+            { q: 'Si 6x = 42, entonces x = 8', a: false, e: 'x = 42 ÷ 6 = 7, no 8.' },
+            { q: 'Si x - 5 = 18, entonces x = 22', a: false, e: 'x = 18 + 5 = 23, no 22.' },
+            { q: 'Si 2x = 16, entonces x = 9', a: false, e: 'x = 16 ÷ 2 = 8, no 9.' },
+            { q: 'Si 3x + 6 = 21, entonces x = 6', a: false, e: '3x = 15, x = 5, no 6.' }
+          ];
+          
+          const numbersProblems = [
+            { q: 'El doble de 35 es 70', a: true, e: '35 × 2 = 70.' },
+            { q: 'La mitad de 84 es 42', a: true, e: '84 ÷ 2 = 42.' },
+            { q: 'El triple de 15 es 45', a: true, e: '15 × 3 = 45.' },
+            { q: 'El cuadrado de 7 es 49', a: true, e: '7² = 7 × 7 = 49.' },
+            { q: 'El cubo de 3 es 27', a: true, e: '3³ = 3 × 3 × 3 = 27.' },
+            { q: 'La raíz cuadrada de 81 es 9', a: true, e: '√81 = 9 porque 9 × 9 = 81.' },
+            { q: 'El triple de 15 es 50', a: false, e: '15 × 3 = 45, no 50.' },
+            { q: 'El cuadrado de 7 es 45', a: false, e: '7² = 49, no 45.' },
+            { q: 'La mitad de 90 es 40', a: false, e: '90 ÷ 2 = 45, no 40.' },
+            { q: 'El doble de 28 es 54', a: false, e: '28 × 2 = 56, no 54.' },
+            { q: 'El cubo de 4 es 60', a: false, e: '4³ = 64, no 60.' },
+            { q: 'La raíz cuadrada de 64 es 7', a: false, e: '√64 = 8, no 7.' }
+          ];
+          
+          // Seleccionar banco según el tema
+          let selectedProblems = numbersProblems; // Por defecto
+          
+          if (mathTopic.includes('division') || mathTopic.includes('dividir') || mathTopic.includes('cociente')) {
+            selectedProblems = divisionProblems;
+          } else if (mathTopic.includes('multiplicacion') || mathTopic.includes('multiplicar') || mathTopic.includes('producto') || mathTopic.includes('tabla')) {
+            selectedProblems = multiplicationProblems;
+          } else if (mathTopic.includes('suma') || mathTopic.includes('sumar') || mathTopic.includes('adicion')) {
+            selectedProblems = additionProblems;
+          } else if (mathTopic.includes('resta') || mathTopic.includes('restar') || mathTopic.includes('sustraccion') || mathTopic.includes('diferencia')) {
+            selectedProblems = subtractionProblems;
+          } else if (mathTopic.includes('fraccion') || mathTopic.includes('fracciones') || mathTopic.includes('numerador') || mathTopic.includes('denominador')) {
+            selectedProblems = fractionProblems;
+          } else if (mathTopic.includes('porcentaje') || mathTopic.includes('porciento') || mathTopic.includes('%')) {
+            selectedProblems = percentageProblems;
+          } else if (mathTopic.includes('ecuacion') || mathTopic.includes('incognita') || mathTopic.includes('variable') || mathTopic.includes('algebra')) {
+            selectedProblems = equationProblems;
+          } else if (mathTopic.includes('numero') || mathTopic.includes('doble') || mathTopic.includes('triple') || mathTopic.includes('mitad') || mathTopic.includes('cuadrado') || mathTopic.includes('potencia') || mathTopic.includes('raiz')) {
+            selectedProblems = numbersProblems;
+          }
+          
+          const problem = selectedProblems[index % selectedProblems.length];
+          question = isEs ? problem.q : problem.q.replace('El resultado de', 'The result of').replace('es igual a', 'equals').replace('entonces', 'then').replace('La mitad de', 'Half of').replace('El doble de', 'Double of').replace('El triple de', 'Triple of').replace('El cuadrado de', 'The square of').replace('El cubo de', 'The cube of').replace('La raíz cuadrada de', 'The square root of').replace('Las fracciones', 'The fractions').replace('son equivalentes', 'are equivalent');
           answer = problem.a;
           explanation = isEs ? problem.e : problem.e.replace('La suma es correcta', 'The addition is correct').replace('La multiplicación es correcta', 'The multiplication is correct').replace('La división es correcta', 'The division is correct').replace('La resta es correcta', 'The subtraction is correct');
         } else if (topicLowerFallback.includes('respiratorio')) {
@@ -1229,36 +1348,121 @@ Respond ONLY with JSON, no additional text.`;
         let options: string[];
         let questionText: string;
         
-        // MATEMÁTICAS: Problemas con cálculos
+        // MATEMÁTICAS: Problemas con cálculos específicos del tema
         if (isMathSubject) {
-          const mathProblems = [
-            // Problemas de suma y resta
-            { q: 'María tiene 45 caramelos y le regalan 28 más. ¿Cuántos caramelos tiene ahora?', opts: ['73 caramelos', '63 caramelos', '83 caramelos', '53 caramelos'], correct: 0, e: '45 + 28 = 73 caramelos.' },
-            { q: 'Juan tenía 92 estampillas y regaló 37. ¿Cuántas estampillas le quedan?', opts: ['55 estampillas', '65 estampillas', '45 estampillas', '129 estampillas'], correct: 0, e: '92 - 37 = 55 estampillas.' },
-            // Problemas de multiplicación
-            { q: 'Un paquete tiene 8 galletas. Si compras 7 paquetes, ¿cuántas galletas tienes en total?', opts: ['56 galletas', '48 galletas', '64 galletas', '15 galletas'], correct: 0, e: '8 × 7 = 56 galletas.' },
-            { q: 'Una caja tiene 12 lápices. ¿Cuántos lápices hay en 9 cajas?', opts: ['108 lápices', '98 lápices', '118 lápices', '21 lápices'], correct: 0, e: '12 × 9 = 108 lápices.' },
-            // Problemas de división
+          const mathTopic = input.topic.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          
+          // Bancos de problemas por tema específico
+          const divisionMCProblems = [
             { q: 'Si tienes 72 manzanas y las repartes entre 8 personas por igual, ¿cuántas manzanas recibe cada uno?', opts: ['9 manzanas', '8 manzanas', '10 manzanas', '7 manzanas'], correct: 0, e: '72 ÷ 8 = 9 manzanas para cada persona.' },
             { q: 'Una biblioteca tiene 156 libros para organizar en 12 estantes iguales. ¿Cuántos libros van en cada estante?', opts: ['13 libros', '12 libros', '14 libros', '15 libros'], correct: 0, e: '156 ÷ 12 = 13 libros por estante.' },
-            // Problemas de fracciones
-            { q: 'Si comes 3/8 de una pizza y tu hermano come 2/8, ¿cuánto comieron entre los dos?', opts: ['5/8 de pizza', '5/16 de pizza', '1/2 de pizza', '6/8 de pizza'], correct: 0, e: '3/8 + 2/8 = 5/8 de pizza.' },
-            { q: '¿Cuánto es 1/4 + 1/2?', opts: ['3/4', '2/6', '1/6', '2/4'], correct: 0, e: '1/4 + 1/2 = 1/4 + 2/4 = 3/4.' },
-            // Problemas de porcentajes
-            { q: 'Una tienda ofrece 20% de descuento en un artículo de $80. ¿Cuánto cuesta con el descuento?', opts: ['$64', '$60', '$72', '$68'], correct: 0, e: '20% de $80 = $16 de descuento. $80 - $16 = $64.' },
-            { q: 'Si el 25% de un número es 15, ¿cuál es el número?', opts: ['60', '45', '75', '40'], correct: 0, e: 'Si 25% = 15, entonces 100% = 15 × 4 = 60.' },
-            // Problemas de ecuaciones
-            { q: 'Si 3x + 5 = 20, ¿cuál es el valor de x?', opts: ['5', '6', '4', '7'], correct: 0, e: '3x + 5 = 20 → 3x = 15 → x = 5.' },
-            { q: 'Si el doble de un número más 8 es igual a 22, ¿cuál es el número?', opts: ['7', '8', '6', '9'], correct: 0, e: '2x + 8 = 22 → 2x = 14 → x = 7.' },
-            // Problemas de geometría
-            { q: 'Un rectángulo tiene 8 cm de largo y 5 cm de ancho. ¿Cuál es su área?', opts: ['40 cm²', '26 cm²', '35 cm²', '45 cm²'], correct: 0, e: 'Área = largo × ancho = 8 × 5 = 40 cm².' },
-            { q: '¿Cuál es el perímetro de un cuadrado de 9 cm de lado?', opts: ['36 cm', '81 cm', '27 cm', '18 cm'], correct: 0, e: 'Perímetro = 4 × lado = 4 × 9 = 36 cm.' },
-            // Problemas de potencias
-            { q: '¿Cuál es el resultado de 5²?', opts: ['25', '10', '52', '125'], correct: 0, e: '5² = 5 × 5 = 25.' },
-            { q: '¿Cuánto es 2⁴?', opts: ['16', '8', '24', '32'], correct: 0, e: '2⁴ = 2 × 2 × 2 × 2 = 16.' }
+            { q: 'Un agricultor tiene 144 naranjas para empacar en cajas de 12. ¿Cuántas cajas necesita?', opts: ['12 cajas', '10 cajas', '14 cajas', '11 cajas'], correct: 0, e: '144 ÷ 12 = 12 cajas.' },
+            { q: 'Si 96 estudiantes se dividen en grupos de 8, ¿cuántos grupos se forman?', opts: ['12 grupos', '10 grupos', '11 grupos', '13 grupos'], correct: 0, e: '96 ÷ 8 = 12 grupos.' },
+            { q: '¿Cuánto es 180 ÷ 15?', opts: ['12', '11', '13', '15'], correct: 0, e: '180 ÷ 15 = 12.' },
+            { q: 'María tiene 84 dulces para repartir entre 7 amigos. ¿Cuántos dulces le tocan a cada uno?', opts: ['12 dulces', '11 dulces', '13 dulces', '10 dulces'], correct: 0, e: '84 ÷ 7 = 12 dulces.' },
+            { q: 'Un bus tiene capacidad para 45 pasajeros. Si hay 5 buses, ¿cuántos pasajeros entran en total si cada bus va lleno y luego se dividen en 9 grupos iguales?', opts: ['25 personas por grupo', '20 personas por grupo', '30 personas por grupo', '15 personas por grupo'], correct: 0, e: '45 × 5 = 225 pasajeros. 225 ÷ 9 = 25 personas por grupo.' },
+            { q: '¿Cuánto es 105 ÷ 7?', opts: ['15', '14', '16', '13'], correct: 0, e: '105 ÷ 7 = 15.' }
           ];
           
-          const problem = mathProblems[index % mathProblems.length];
+          const multiplicationMCProblems = [
+            { q: 'Un paquete tiene 8 galletas. Si compras 7 paquetes, ¿cuántas galletas tienes en total?', opts: ['56 galletas', '48 galletas', '64 galletas', '15 galletas'], correct: 0, e: '8 × 7 = 56 galletas.' },
+            { q: 'Una caja tiene 12 lápices. ¿Cuántos lápices hay en 9 cajas?', opts: ['108 lápices', '98 lápices', '118 lápices', '21 lápices'], correct: 0, e: '12 × 9 = 108 lápices.' },
+            { q: 'Un cine tiene 15 filas con 12 asientos cada una. ¿Cuántos asientos hay en total?', opts: ['180 asientos', '170 asientos', '190 asientos', '27 asientos'], correct: 0, e: '15 × 12 = 180 asientos.' },
+            { q: 'Si una docena son 12 unidades, ¿cuántas unidades hay en 8 docenas?', opts: ['96 unidades', '86 unidades', '106 unidades', '20 unidades'], correct: 0, e: '12 × 8 = 96 unidades.' },
+            { q: '¿Cuál es el resultado de 7 × 9?', opts: ['63', '56', '72', '54'], correct: 0, e: '7 × 9 = 63.' },
+            { q: 'Un jardín tiene 6 filas de flores con 11 flores cada una. ¿Cuántas flores hay?', opts: ['66 flores', '56 flores', '76 flores', '17 flores'], correct: 0, e: '6 × 11 = 66 flores.' },
+            { q: 'Si caminas 8 km cada día, ¿cuántos km caminas en 2 semanas?', opts: ['112 km', '102 km', '122 km', '56 km'], correct: 0, e: '8 × 14 = 112 km.' },
+            { q: '¿Cuánto es 9 × 8?', opts: ['72', '63', '81', '64'], correct: 0, e: '9 × 8 = 72.' }
+          ];
+          
+          const additionMCProblems = [
+            { q: 'María tiene 45 caramelos y le regalan 28 más. ¿Cuántos caramelos tiene ahora?', opts: ['73 caramelos', '63 caramelos', '83 caramelos', '53 caramelos'], correct: 0, e: '45 + 28 = 73 caramelos.' },
+            { q: 'Pedro tiene 156 estampillas y compra 89 más. ¿Cuántas tiene en total?', opts: ['245 estampillas', '235 estampillas', '255 estampillas', '225 estampillas'], correct: 0, e: '156 + 89 = 245 estampillas.' },
+            { q: 'En una granja hay 67 vacas y llegan 48 más. ¿Cuántas vacas hay ahora?', opts: ['115 vacas', '105 vacas', '125 vacas', '95 vacas'], correct: 0, e: '67 + 48 = 115 vacas.' },
+            { q: '¿Cuál es el resultado de 234 + 178?', opts: ['412', '402', '422', '392'], correct: 0, e: '234 + 178 = 412.' },
+            { q: 'Ana tenía $125 y ganó $87. ¿Cuánto dinero tiene ahora?', opts: ['$212', '$202', '$222', '$192'], correct: 0, e: '$125 + $87 = $212.' },
+            { q: 'Un tren tiene 89 pasajeros y suben 56 más. ¿Cuántos pasajeros hay ahora?', opts: ['145 pasajeros', '135 pasajeros', '155 pasajeros', '125 pasajeros'], correct: 0, e: '89 + 56 = 145 pasajeros.' },
+            { q: '¿Cuánto es 99 + 78?', opts: ['177', '167', '187', '157'], correct: 0, e: '99 + 78 = 177.' },
+            { q: 'Carlos leyó 134 páginas el lunes y 98 el martes. ¿Cuántas páginas leyó en total?', opts: ['232 páginas', '222 páginas', '242 páginas', '212 páginas'], correct: 0, e: '134 + 98 = 232 páginas.' }
+          ];
+          
+          const subtractionMCProblems = [
+            { q: 'Juan tenía 92 estampillas y regaló 37. ¿Cuántas estampillas le quedan?', opts: ['55 estampillas', '65 estampillas', '45 estampillas', '129 estampillas'], correct: 0, e: '92 - 37 = 55 estampillas.' },
+            { q: 'Una tienda tenía 200 productos y vendió 87. ¿Cuántos quedan?', opts: ['113 productos', '123 productos', '103 productos', '93 productos'], correct: 0, e: '200 - 87 = 113 productos.' },
+            { q: 'Pedro tiene $150 y gasta $68. ¿Cuánto dinero le queda?', opts: ['$82', '$92', '$72', '$62'], correct: 0, e: '$150 - $68 = $82.' },
+            { q: '¿Cuánto es 175 - 89?', opts: ['86', '96', '76', '66'], correct: 0, e: '175 - 89 = 86.' },
+            { q: 'Un autobús tenía 95 pasajeros y bajaron 48. ¿Cuántos quedaron?', opts: ['47 pasajeros', '57 pasajeros', '37 pasajeros', '67 pasajeros'], correct: 0, e: '95 - 48 = 47 pasajeros.' },
+            { q: 'Ana tenía 234 figuritas y perdió 156. ¿Cuántas le quedan?', opts: ['78 figuritas', '88 figuritas', '68 figuritas', '98 figuritas'], correct: 0, e: '234 - 156 = 78 figuritas.' },
+            { q: '¿Cuál es la diferencia entre 300 y 187?', opts: ['113', '123', '103', '93'], correct: 0, e: '300 - 187 = 113.' },
+            { q: 'En una escuela hay 456 alumnos y se fueron 189. ¿Cuántos quedan?', opts: ['267 alumnos', '277 alumnos', '257 alumnos', '287 alumnos'], correct: 0, e: '456 - 189 = 267 alumnos.' }
+          ];
+          
+          const fractionMCProblems = [
+            { q: 'Si comes 3/8 de una pizza y tu hermano come 2/8, ¿cuánto comieron entre los dos?', opts: ['5/8 de pizza', '5/16 de pizza', '1/2 de pizza', '6/8 de pizza'], correct: 0, e: '3/8 + 2/8 = 5/8 de pizza.' },
+            { q: '¿Cuánto es 1/4 + 1/2?', opts: ['3/4', '2/6', '1/6', '2/4'], correct: 0, e: '1/4 + 1/2 = 1/4 + 2/4 = 3/4.' },
+            { q: '¿Cuánto es 2/3 + 1/6?', opts: ['5/6', '3/9', '4/6', '3/6'], correct: 0, e: '2/3 = 4/6, entonces 4/6 + 1/6 = 5/6.' },
+            { q: 'María comió 1/3 de un pastel y Ana 1/4. ¿Cuánto comieron juntas?', opts: ['7/12', '2/7', '5/12', '4/12'], correct: 0, e: '1/3 = 4/12 y 1/4 = 3/12. Total: 7/12.' },
+            { q: '¿Cuál fracción es equivalente a 1/2?', opts: ['3/6', '2/3', '3/4', '1/3'], correct: 0, e: '3/6 simplificado es 1/2.' },
+            { q: '¿Cuánto es 3/4 - 1/4?', opts: ['2/4 o 1/2', '4/4', '2/8', '4/8'], correct: 0, e: '3/4 - 1/4 = 2/4 = 1/2.' },
+            { q: '¿Cuánto es 1/2 × 2/3?', opts: ['2/6 o 1/3', '3/5', '2/5', '3/6'], correct: 0, e: '1/2 × 2/3 = 2/6 = 1/3.' },
+            { q: 'Si tienes 3/5 de un litro de jugo y tomas 1/5, ¿cuánto queda?', opts: ['2/5 de litro', '4/5 de litro', '2/10 de litro', '3/10 de litro'], correct: 0, e: '3/5 - 1/5 = 2/5 de litro.' }
+          ];
+          
+          const percentageMCProblems = [
+            { q: 'Una tienda ofrece 20% de descuento en un artículo de $80. ¿Cuánto cuesta con el descuento?', opts: ['$64', '$60', '$72', '$68'], correct: 0, e: '20% de $80 = $16. $80 - $16 = $64.' },
+            { q: 'Si el 25% de un número es 15, ¿cuál es el número?', opts: ['60', '45', '75', '40'], correct: 0, e: 'Si 25% = 15, entonces 100% = 15 × 4 = 60.' },
+            { q: '¿Cuánto es el 30% de 200?', opts: ['60', '50', '70', '40'], correct: 0, e: '30% de 200 = 200 × 0.30 = 60.' },
+            { q: 'Un producto costaba $50 y subió un 10%. ¿Cuál es el nuevo precio?', opts: ['$55', '$60', '$45', '$50'], correct: 0, e: '10% de $50 = $5. Nuevo precio: $55.' },
+            { q: 'En una clase de 40 alumnos, el 75% aprobó. ¿Cuántos aprobaron?', opts: ['30 alumnos', '25 alumnos', '35 alumnos', '20 alumnos'], correct: 0, e: '75% de 40 = 30 alumnos.' },
+            { q: '¿Qué porcentaje de 80 es 20?', opts: ['25%', '20%', '30%', '15%'], correct: 0, e: '20/80 = 0.25 = 25%.' },
+            { q: 'Si ahorras el 15% de $300, ¿cuánto ahorras?', opts: ['$45', '$40', '$50', '$35'], correct: 0, e: '15% de $300 = 300 × 0.15 = $45.' },
+            { q: 'Un artículo de $120 tiene 25% de descuento. ¿Cuánto pagas?', opts: ['$90', '$95', '$85', '$80'], correct: 0, e: '25% de $120 = $30. $120 - $30 = $90.' }
+          ];
+          
+          const equationMCProblems = [
+            { q: 'Si 3x + 5 = 20, ¿cuál es el valor de x?', opts: ['5', '6', '4', '7'], correct: 0, e: '3x + 5 = 20 → 3x = 15 → x = 5.' },
+            { q: 'Si el doble de un número más 8 es igual a 22, ¿cuál es el número?', opts: ['7', '8', '6', '9'], correct: 0, e: '2x + 8 = 22 → 2x = 14 → x = 7.' },
+            { q: 'Resuelve: 4x = 36', opts: ['x = 9', 'x = 8', 'x = 10', 'x = 7'], correct: 0, e: '4x = 36 → x = 36 ÷ 4 = 9.' },
+            { q: 'Si x - 15 = 27, ¿cuánto vale x?', opts: ['42', '12', '32', '52'], correct: 0, e: 'x = 27 + 15 = 42.' },
+            { q: 'Resuelve: 2x + 3 = 15', opts: ['x = 6', 'x = 7', 'x = 5', 'x = 8'], correct: 0, e: '2x = 12 → x = 6.' },
+            { q: 'Si 5x - 10 = 25, ¿cuál es x?', opts: ['7', '5', '8', '6'], correct: 0, e: '5x = 35 → x = 7.' },
+            { q: 'La suma de un número y 18 es 45. ¿Cuál es el número?', opts: ['27', '37', '17', '63'], correct: 0, e: 'x + 18 = 45 → x = 27.' },
+            { q: 'Si x/4 = 12, ¿cuánto vale x?', opts: ['48', '3', '16', '8'], correct: 0, e: 'x = 12 × 4 = 48.' }
+          ];
+          
+          const numbersMCProblems = [
+            { q: '¿Cuál es el resultado de 5²?', opts: ['25', '10', '52', '125'], correct: 0, e: '5² = 5 × 5 = 25.' },
+            { q: '¿Cuánto es 2⁴?', opts: ['16', '8', '24', '32'], correct: 0, e: '2⁴ = 2 × 2 × 2 × 2 = 16.' },
+            { q: '¿Cuál es el doble de 45?', opts: ['90', '80', '100', '85'], correct: 0, e: '45 × 2 = 90.' },
+            { q: '¿Cuál es la mitad de 126?', opts: ['63', '53', '73', '83'], correct: 0, e: '126 ÷ 2 = 63.' },
+            { q: '¿Cuál es el triple de 23?', opts: ['69', '59', '79', '46'], correct: 0, e: '23 × 3 = 69.' },
+            { q: '¿Cuánto es 3³?', opts: ['27', '9', '18', '81'], correct: 0, e: '3³ = 3 × 3 × 3 = 27.' },
+            { q: '¿Cuál es la raíz cuadrada de 144?', opts: ['12', '14', '11', '13'], correct: 0, e: '√144 = 12 porque 12 × 12 = 144.' },
+            { q: '¿Cuánto es el cuadrado de 9?', opts: ['81', '18', '72', '91'], correct: 0, e: '9² = 9 × 9 = 81.' }
+          ];
+          
+          // Seleccionar banco según el tema
+          let selectedProblems = numbersMCProblems; // Por defecto
+          
+          if (mathTopic.includes('division') || mathTopic.includes('dividir') || mathTopic.includes('cociente')) {
+            selectedProblems = divisionMCProblems;
+          } else if (mathTopic.includes('multiplicacion') || mathTopic.includes('multiplicar') || mathTopic.includes('producto') || mathTopic.includes('tabla')) {
+            selectedProblems = multiplicationMCProblems;
+          } else if (mathTopic.includes('suma') || mathTopic.includes('sumar') || mathTopic.includes('adicion')) {
+            selectedProblems = additionMCProblems;
+          } else if (mathTopic.includes('resta') || mathTopic.includes('restar') || mathTopic.includes('sustraccion') || mathTopic.includes('diferencia')) {
+            selectedProblems = subtractionMCProblems;
+          } else if (mathTopic.includes('fraccion') || mathTopic.includes('fracciones') || mathTopic.includes('numerador') || mathTopic.includes('denominador')) {
+            selectedProblems = fractionMCProblems;
+          } else if (mathTopic.includes('porcentaje') || mathTopic.includes('porciento') || mathTopic.includes('%')) {
+            selectedProblems = percentageMCProblems;
+          } else if (mathTopic.includes('ecuacion') || mathTopic.includes('incognita') || mathTopic.includes('variable') || mathTopic.includes('algebra')) {
+            selectedProblems = equationMCProblems;
+          } else if (mathTopic.includes('numero') || mathTopic.includes('doble') || mathTopic.includes('triple') || mathTopic.includes('mitad') || mathTopic.includes('cuadrado') || mathTopic.includes('potencia') || mathTopic.includes('raiz')) {
+            selectedProblems = numbersMCProblems;
+          }
+          
+          const problem = selectedProblems[index % selectedProblems.length];
           questionText = isEs ? problem.q : problem.q;
           options = problem.opts;
           
@@ -1523,29 +1727,105 @@ Respond ONLY with JSON, no additional text.`;
         let questionText: string;
         let explanation: string;
         
-        // MATEMÁTICAS: Preguntas de selección múltiple con varias respuestas correctas
+        // MATEMÁTICAS: Preguntas de selección múltiple específicas del tema
         if (isMathSubject) {
-          const mathMultipleSelection = [
-            // Operaciones con mismo resultado
-            { q: '¿Cuáles de las siguientes operaciones dan como resultado 24?', opts: ['6 × 4', '30 - 5', '48 ÷ 2', '20 + 5'], correct: [0, 2], e: '6 × 4 = 24 y 48 ÷ 2 = 24. Las otras dan 25.' },
-            { q: '¿Cuáles de las siguientes operaciones dan como resultado 36?', opts: ['6 × 6', '42 - 6', '72 ÷ 3', '30 + 6'], correct: [0, 1, 2], e: '6 × 6 = 36, 42 - 6 = 36, y 72 ÷ 3 = 24 (no), 30 + 6 = 36. Correctas: 6×6, 42-6, 30+6.' },
-            { q: '¿Cuáles de las siguientes operaciones dan como resultado 15?', opts: ['3 × 5', '18 - 3', '45 ÷ 3', '8 + 6'], correct: [0, 1, 2], e: '3 × 5 = 15, 18 - 3 = 15, 45 ÷ 3 = 15. Solo 8 + 6 = 14.' },
-            // Propiedades de números
-            { q: '¿Cuáles de los siguientes son números pares?', opts: ['14', '23', '36', '41'], correct: [0, 2], e: '14 y 36 son pares (divisibles por 2). 23 y 41 son impares.' },
-            { q: '¿Cuáles de los siguientes son múltiplos de 5?', opts: ['25', '32', '45', '53'], correct: [0, 2], e: '25 y 45 terminan en 0 o 5, son múltiplos de 5.' },
-            { q: '¿Cuáles de los siguientes son números primos?', opts: ['7', '9', '11', '15'], correct: [0, 2], e: '7 y 11 son primos. 9 = 3×3 y 15 = 3×5 no lo son.' },
-            // Fracciones equivalentes
-            { q: '¿Cuáles fracciones son equivalentes a 1/2?', opts: ['2/4', '3/5', '4/8', '5/9'], correct: [0, 2], e: '2/4 = 1/2 y 4/8 = 1/2 son equivalentes.' },
-            { q: '¿Cuáles fracciones son equivalentes a 2/3?', opts: ['4/6', '3/4', '6/9', '5/6'], correct: [0, 2], e: '4/6 = 2/3 y 6/9 = 2/3 son equivalentes.' },
-            // Propiedades geométricas
-            { q: '¿Cuáles de las siguientes figuras tienen 4 lados?', opts: ['Cuadrado', 'Triángulo', 'Rectángulo', 'Círculo'], correct: [0, 2], e: 'El cuadrado y el rectángulo tienen 4 lados.' },
-            { q: '¿Cuáles de los siguientes ángulos son agudos?', opts: ['30°', '90°', '45°', '180°'], correct: [0, 2], e: '30° y 45° son menores que 90°, por lo tanto son agudos.' },
-            // Ecuaciones correctas
-            { q: '¿En cuáles ecuaciones x = 4?', opts: ['2x = 8', '3x = 15', 'x + 5 = 9', 'x - 2 = 3'], correct: [0, 2], e: '2×4 = 8 ✓ y 4+5 = 9 ✓. En las otras x = 5.' },
-            { q: '¿Cuáles expresiones son iguales a 20?', opts: ['4 × 5', '25 - 6', '100 ÷ 5', '12 + 8'], correct: [0, 2, 3], e: '4×5 = 20, 100÷5 = 20, 12+8 = 20. Solo 25-6 = 19.' }
+          const mathTopic = input.topic.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          
+          // Bancos por tema específico
+          const divisionMSProblems = [
+            { q: '¿Cuáles de las siguientes divisiones dan como resultado 8?', opts: ['64 ÷ 8', '72 ÷ 8', '56 ÷ 7', '48 ÷ 8'], correct: [0, 2], e: '64 ÷ 8 = 8 y 56 ÷ 7 = 8. Las otras dan 9 y 6.' },
+            { q: '¿Cuáles divisiones son exactas (sin residuo)?', opts: ['45 ÷ 9', '37 ÷ 5', '72 ÷ 8', '50 ÷ 7'], correct: [0, 2], e: '45 ÷ 9 = 5 y 72 ÷ 8 = 9 son exactas.' },
+            { q: '¿Cuáles de las siguientes divisiones dan como resultado 12?', opts: ['144 ÷ 12', '108 ÷ 9', '96 ÷ 8', '84 ÷ 6'], correct: [0, 2], e: '144 ÷ 12 = 12 y 96 ÷ 8 = 12.' },
+            { q: '¿En cuáles casos el cociente es mayor que 10?', opts: ['120 ÷ 10', '88 ÷ 8', '135 ÷ 9', '99 ÷ 11'], correct: [0, 1, 2], e: '120÷10=12, 88÷8=11, 135÷9=15 son >10. 99÷11=9.' },
+            { q: '¿Cuáles divisiones dan un resultado par?', opts: ['48 ÷ 6', '63 ÷ 9', '42 ÷ 7', '54 ÷ 6'], correct: [0, 2], e: '48÷6=8 y 42÷7=6 son pares. 63÷9=7 y 54÷6=9 son impares.' },
+            { q: '¿Cuáles de estas son divisiones entre 7?', opts: ['49 ÷ 7', '56 ÷ 7', '63 ÷ 9', '77 ÷ 7'], correct: [0, 1, 3], e: '49, 56 y 77 son divisibles por 7.' }
           ];
           
-          const problem = mathMultipleSelection[index % mathMultipleSelection.length];
+          const multiplicationMSProblems = [
+            { q: '¿Cuáles de las siguientes multiplicaciones dan como resultado 48?', opts: ['6 × 8', '7 × 7', '8 × 6', '5 × 9'], correct: [0, 2], e: '6 × 8 = 48 y 8 × 6 = 48.' },
+            { q: '¿Cuáles productos son mayores que 50?', opts: ['8 × 7', '6 × 8', '9 × 6', '7 × 6'], correct: [0, 2], e: '8×7=56 y 9×6=54 son >50. 6×8=48 y 7×6=42.' },
+            { q: '¿Cuáles de las siguientes multiplicaciones dan un número par?', opts: ['7 × 6', '5 × 5', '8 × 3', '9 × 9'], correct: [0, 2], e: '7×6=42 y 8×3=24 son pares.' },
+            { q: '¿Cuáles multiplicaciones dan como resultado 72?', opts: ['8 × 9', '6 × 11', '9 × 8', '7 × 10'], correct: [0, 2], e: '8 × 9 = 72 y 9 × 8 = 72.' },
+            { q: '¿Cuáles son multiplicaciones de la tabla del 9?', opts: ['9 × 7 = 63', '8 × 8 = 64', '9 × 9 = 81', '7 × 7 = 49'], correct: [0, 2], e: '63 y 81 son de la tabla del 9.' },
+            { q: '¿Cuáles resultados son múltiplos de 12?', opts: ['4 × 3', '5 × 5', '6 × 4', '7 × 2'], correct: [0, 2], e: '4×3=12 y 6×4=24 son múltiplos de 12.' }
+          ];
+          
+          const additionMSProblems = [
+            { q: '¿Cuáles de las siguientes sumas dan como resultado 100?', opts: ['45 + 55', '60 + 50', '67 + 33', '48 + 42'], correct: [0, 2], e: '45+55=100 y 67+33=100.' },
+            { q: '¿Cuáles sumas dan un resultado mayor que 150?', opts: ['89 + 67', '75 + 68', '92 + 59', '84 + 65'], correct: [0, 2], e: '89+67=156 y 92+59=151 son >150.' },
+            { q: '¿Cuáles de estas sumas son correctas?', opts: ['78 + 45 = 123', '89 + 34 = 113', '56 + 67 = 123', '45 + 78 = 123'], correct: [0, 2, 3], e: '78+45=123, 56+67=123, 45+78=123.' },
+            { q: '¿Cuáles sumas dan un número par?', opts: ['35 + 47', '48 + 36', '67 + 25', '54 + 28'], correct: [1, 3], e: '48+36=84 y 54+28=82 son pares.' },
+            { q: '¿Cuáles de las siguientes sumas dan 200?', opts: ['125 + 75', '150 + 60', '134 + 66', '145 + 45'], correct: [0, 2], e: '125+75=200 y 134+66=200.' },
+            { q: '¿Cuáles operaciones de suma son mayores que 80?', opts: ['45 + 38', '32 + 45', '56 + 29', '67 + 18'], correct: [0, 2, 3], e: '45+38=83, 56+29=85, 67+18=85 son >80.' }
+          ];
+          
+          const subtractionMSProblems = [
+            { q: '¿Cuáles de las siguientes restas dan como resultado 25?', opts: ['75 - 50', '60 - 45', '100 - 75', '80 - 55'], correct: [0, 2, 3], e: '75-50=25, 100-75=25, 80-55=25.' },
+            { q: '¿Cuáles restas dan un resultado mayor que 40?', opts: ['95 - 48', '78 - 35', '120 - 85', '67 - 25'], correct: [0, 2, 3], e: '95-48=47, 120-85=35(no), 67-25=42 son >40.' },
+            { q: '¿Cuáles de estas restas son correctas?', opts: ['100 - 37 = 63', '85 - 48 = 47', '93 - 56 = 37', '78 - 29 = 49'], correct: [0, 2, 3], e: '100-37=63, 93-56=37, 78-29=49.' },
+            { q: '¿Cuáles restas dan un resultado par?', opts: ['86 - 42', '75 - 31', '94 - 48', '67 - 25'], correct: [0, 2, 3], e: '86-42=44, 94-48=46, 67-25=42 son pares.' },
+            { q: '¿Cuáles diferencias son menores que 30?', opts: ['85 - 60', '70 - 45', '100 - 65', '90 - 75'], correct: [0, 1, 3], e: '85-60=25, 70-45=25, 90-75=15 son <30.' },
+            { q: '¿Cuáles de las siguientes restas dan 50?', opts: ['125 - 75', '90 - 50', '100 - 50', '145 - 95'], correct: [0, 2, 3], e: '125-75=50, 100-50=50, 145-95=50.' }
+          ];
+          
+          const fractionMSProblems = [
+            { q: '¿Cuáles fracciones son equivalentes a 1/2?', opts: ['2/4', '3/5', '4/8', '5/9'], correct: [0, 2], e: '2/4 = 1/2 y 4/8 = 1/2 son equivalentes.' },
+            { q: '¿Cuáles fracciones son equivalentes a 2/3?', opts: ['4/6', '3/4', '6/9', '5/6'], correct: [0, 2], e: '4/6 = 2/3 y 6/9 = 2/3 son equivalentes.' },
+            { q: '¿Cuáles son fracciones propias (menor que 1)?', opts: ['3/4', '5/3', '2/5', '7/4'], correct: [0, 2], e: '3/4 y 2/5 son menores que 1.' },
+            { q: '¿Cuáles fracciones son mayores que 1/2?', opts: ['3/4', '2/5', '5/8', '3/7'], correct: [0, 2], e: '3/4 = 0.75 y 5/8 = 0.625 son >0.5.' },
+            { q: '¿Cuáles sumas de fracciones dan 1?', opts: ['1/2 + 1/2', '1/3 + 1/3', '3/4 + 1/4', '2/5 + 2/5'], correct: [0, 2], e: '1/2+1/2=1 y 3/4+1/4=1.' },
+            { q: '¿Cuáles fracciones son equivalentes a 3/4?', opts: ['6/8', '9/12', '4/5', '12/16'], correct: [0, 1, 3], e: '6/8, 9/12 y 12/16 son equivalentes a 3/4.' }
+          ];
+          
+          const percentageMSProblems = [
+            { q: '¿Cuáles de los siguientes son el 50%?', opts: ['50 de 100', '25 de 50', '30 de 50', '40 de 80'], correct: [0, 1, 3], e: '50/100, 25/50 y 40/80 son 50%.' },
+            { q: '¿Cuáles porcentajes son equivalentes a 1/4?', opts: ['25%', '20%', '0.25', '75%'], correct: [0, 2], e: '25% = 0.25 = 1/4.' },
+            { q: '¿Cuáles representan el 10% de 200?', opts: ['20', '10', '200 × 0.1', '30'], correct: [0, 2], e: '10% de 200 = 20 = 200 × 0.1.' },
+            { q: '¿Cuáles descuentos son mayores que $30 en un producto de $100?', opts: ['40% de descuento', '25% de descuento', '35% de descuento', '50% de descuento'], correct: [0, 2, 3], e: '40%=$40, 35%=$35, 50%=$50 son >$30.' },
+            { q: '¿Cuáles son formas de expresar 75%?', opts: ['3/4', '0.75', '7/10', '75/100'], correct: [0, 1, 3], e: '75% = 3/4 = 0.75 = 75/100.' },
+            { q: '¿En cuáles casos el porcentaje es mayor que 50%?', opts: ['60 de 100', '30 de 50', '25 de 40', '45 de 100'], correct: [0, 1, 2], e: '60/100=60%, 30/50=60%, 25/40=62.5%.' }
+          ];
+          
+          const equationMSProblems = [
+            { q: '¿En cuáles ecuaciones x = 4?', opts: ['2x = 8', '3x = 15', 'x + 5 = 9', 'x - 2 = 3'], correct: [0, 2], e: '2×4=8 ✓ y 4+5=9 ✓.' },
+            { q: '¿Cuáles ecuaciones tienen x = 6?', opts: ['3x = 18', 'x + 4 = 10', '2x = 10', 'x - 1 = 5'], correct: [0, 1, 3], e: '3×6=18, 6+4=10, 6-1=5.' },
+            { q: '¿Cuáles son ecuaciones lineales correctas?', opts: ['2x + 3 = 11 si x=4', '5x = 25 si x=5', '3x - 2 = 10 si x=5', 'x + 8 = 15 si x=7'], correct: [0, 1, 3], e: '2(4)+3=11, 5(5)=25, 7+8=15.' },
+            { q: '¿Cuáles valores de x satisfacen x > 5?', opts: ['x = 7', 'x = 3', 'x = 10', 'x = 5'], correct: [0, 2], e: '7 y 10 son mayores que 5.' },
+            { q: '¿Cuáles ecuaciones tienen solución x = 3?', opts: ['4x = 12', '2x + 1 = 7', 'x - 5 = 2', '3x = 9'], correct: [0, 1, 3], e: '4(3)=12, 2(3)+1=7, 3(3)=9.' },
+            { q: '¿Cuáles expresiones son iguales a 2x cuando x=5?', opts: ['10', 'x + x', '15', 'x × 2'], correct: [0, 1, 3], e: '2(5)=10, x+x=10, x×2=10.' }
+          ];
+          
+          const numbersMSProblems = [
+            { q: '¿Cuáles de los siguientes son números pares?', opts: ['14', '23', '36', '41'], correct: [0, 2], e: '14 y 36 son pares.' },
+            { q: '¿Cuáles de los siguientes son múltiplos de 5?', opts: ['25', '32', '45', '53'], correct: [0, 2], e: '25 y 45 son múltiplos de 5.' },
+            { q: '¿Cuáles de los siguientes son números primos?', opts: ['7', '9', '11', '15'], correct: [0, 2], e: '7 y 11 son primos.' },
+            { q: '¿Cuáles son potencias de 2?', opts: ['8', '10', '16', '12'], correct: [0, 2], e: '8=2³ y 16=2⁴.' },
+            { q: '¿Cuáles números son divisibles por 3?', opts: ['12', '14', '18', '20'], correct: [0, 2], e: '12 y 18 son divisibles por 3.' },
+            { q: '¿Cuáles son cuadrados perfectos?', opts: ['16', '18', '25', '30'], correct: [0, 2], e: '16=4² y 25=5².' }
+          ];
+          
+          // Seleccionar banco según el tema
+          let selectedProblems = numbersMSProblems; // Por defecto
+          
+          if (mathTopic.includes('division') || mathTopic.includes('dividir') || mathTopic.includes('cociente')) {
+            selectedProblems = divisionMSProblems;
+          } else if (mathTopic.includes('multiplicacion') || mathTopic.includes('multiplicar') || mathTopic.includes('producto') || mathTopic.includes('tabla')) {
+            selectedProblems = multiplicationMSProblems;
+          } else if (mathTopic.includes('suma') || mathTopic.includes('sumar') || mathTopic.includes('adicion')) {
+            selectedProblems = additionMSProblems;
+          } else if (mathTopic.includes('resta') || mathTopic.includes('restar') || mathTopic.includes('sustraccion') || mathTopic.includes('diferencia')) {
+            selectedProblems = subtractionMSProblems;
+          } else if (mathTopic.includes('fraccion') || mathTopic.includes('fracciones') || mathTopic.includes('numerador') || mathTopic.includes('denominador')) {
+            selectedProblems = fractionMSProblems;
+          } else if (mathTopic.includes('porcentaje') || mathTopic.includes('porciento') || mathTopic.includes('%')) {
+            selectedProblems = percentageMSProblems;
+          } else if (mathTopic.includes('ecuacion') || mathTopic.includes('incognita') || mathTopic.includes('variable') || mathTopic.includes('algebra')) {
+            selectedProblems = equationMSProblems;
+          } else if (mathTopic.includes('numero') || mathTopic.includes('doble') || mathTopic.includes('triple') || mathTopic.includes('mitad') || mathTopic.includes('cuadrado') || mathTopic.includes('potencia') || mathTopic.includes('raiz') || mathTopic.includes('par') || mathTopic.includes('impar') || mathTopic.includes('primo') || mathTopic.includes('multiplo')) {
+            selectedProblems = numbersMSProblems;
+          }
+          
+          const problem = selectedProblems[index % selectedProblems.length];
           options = problem.opts;
           questionText = isEs ? problem.q : problem.q;
           explanation = isEs ? problem.e : problem.e;
