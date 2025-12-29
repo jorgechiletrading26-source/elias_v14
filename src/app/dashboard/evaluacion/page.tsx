@@ -151,9 +151,10 @@ export default function EvaluacionPage() {
     return '📖';
   }, [selectedBook, selectedSubject]);
 
-  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura
+  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura O cuando cambia el idioma
   useEffect(() => {
-    const analyzeKey = `${selectedCourse}_${selectedSubject}`;
+    // Incluir el idioma en la clave para forzar re-análisis cuando cambie
+    const analyzeKey = `${selectedCourse}_${selectedSubject}_${currentUiLanguage}`;
     
     if (selectedCourse && selectedSubject && hasAnalyzedRef.current !== analyzeKey) {
       hasAnalyzedRef.current = analyzeKey;
@@ -162,7 +163,7 @@ export default function EvaluacionPage() {
       setSelectedSubjectTopic('');
       setSubjectBookTitle('');
       
-      console.log('[Evaluation] Starting subject analysis for:', selectedCourse, selectedSubject);
+      console.log('[Evaluation] Starting subject analysis for:', selectedCourse, selectedSubject, 'Language:', currentUiLanguage);
       
       analyzeSubjectTopics({
         courseName: selectedCourse,
@@ -1716,7 +1717,7 @@ export default function EvaluacionPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-purple-500">📖</span>
                           <h4 className="font-semibold text-purple-700 dark:text-purple-300 text-sm">
-                            Descripción:
+                            {translate('topicDescriptionLabel') || 'Descripción:'}
                           </h4>
                         </div>
                         <p className="text-xs text-purple-600 dark:text-purple-400">

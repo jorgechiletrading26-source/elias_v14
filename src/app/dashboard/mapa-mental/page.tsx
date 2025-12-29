@@ -62,9 +62,10 @@ export default function MapaMentalPage() {
     setCentralTheme('');
   }, [selectedCourse, selectedSubject]);
 
-  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura
+  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura O cuando cambia el idioma
   useEffect(() => {
-    const analyzeKey = `${selectedCourse}_${selectedSubject}`;
+    // Incluir el idioma en la clave para forzar re-análisis cuando cambie
+    const analyzeKey = `${selectedCourse}_${selectedSubject}_${currentUiLanguage}`;
     
     if (selectedCourse && selectedSubject && hasAnalyzedRef.current !== analyzeKey) {
       hasAnalyzedRef.current = analyzeKey;
@@ -73,7 +74,7 @@ export default function MapaMentalPage() {
       setSelectedSubjectTopic('');
       setSubjectBookTitle('');
       
-      console.log('[MapaMental] Starting subject analysis for:', selectedCourse, selectedSubject);
+      console.log('[MapaMental] Starting subject analysis for:', selectedCourse, selectedSubject, 'Language:', currentUiLanguage);
       
       analyzeSubjectTopics({
         courseName: selectedCourse,
@@ -368,7 +369,7 @@ export default function MapaMentalPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-yellow-500">📖</span>
                         <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 text-sm">
-                          Descripción:
+                          {translate('topicDescriptionLabel') || 'Descripción:'}
                         </h4>
                       </div>
                       <p className="text-xs text-yellow-600 dark:text-yellow-400">

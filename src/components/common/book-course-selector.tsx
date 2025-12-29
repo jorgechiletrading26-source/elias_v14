@@ -176,7 +176,15 @@ export function BookCourseSelector({
       'Ciencias Naturales': translate('subjectCienciasNaturales'),
       'Historia, Geografía y Ciencias Sociales': translate('subjectHistoriaGeografia'),
       'Lenguaje y Comunicación': translate('subjectLenguajeComunicacion'),
+      'Lengua y Literatura': translate('subjectLenguaLiteratura'),
       'Matemáticas': translate('subjectMatematicas'),
+      'Física': translate('subjectFisica'),
+      'Química': translate('subjectQuimica'),
+      'Biología': translate('subjectBiologia'),
+      'Filosofía': translate('subjectFilosofia'),
+      'Educación Ciudadana': translate('subjectEducacionCiudadana'),
+      'Ciencias para la Ciudadanía': translate('subjectCienciasCiudadania'),
+      'Inglés': translate('subjectIngles'),
     };
     
     // Si encontramos una coincidencia exacta, usarla
@@ -193,17 +201,35 @@ export function BookCourseSelector({
     if (lowerSubject.includes('ciencias naturales') || lowerSubject.includes('natural sciences')) {
       return translate('subjectCienciasNaturales');
     }
+    if (lowerSubject.includes('ciencias para la ciudadanía') || lowerSubject.includes('ciencias para la ciudadania') || lowerSubject.includes('science for citizenship')) {
+      return translate('subjectCienciasCiudadania');
+    }
     if (lowerSubject.includes('historia') && (lowerSubject.includes('geografía') || lowerSubject.includes('geografia') || lowerSubject.includes('geography'))) {
       return translate('subjectHistoriaGeografia');
     }
     if (lowerSubject.includes('lenguaje') && (lowerSubject.includes('comunicación') || lowerSubject.includes('comunicacion') || lowerSubject.includes('communication'))) {
       return translate('subjectLenguajeComunicacion');
     }
+    if (lowerSubject.includes('lengua') && lowerSubject.includes('literatura')) {
+      return translate('subjectLenguaLiteratura');
+    }
     if (lowerSubject.includes('física') || lowerSubject.includes('fisica') || lowerSubject.includes('physics')) {
       return translate('subjectFisica');
     }
     if (lowerSubject.includes('química') || lowerSubject.includes('quimica') || lowerSubject.includes('chemistry')) {
       return translate('subjectQuimica');
+    }
+    if (lowerSubject.includes('biología') || lowerSubject.includes('biologia') || lowerSubject.includes('biology')) {
+      return translate('subjectBiologia');
+    }
+    if (lowerSubject.includes('filosofía') || lowerSubject.includes('filosofia') || lowerSubject.includes('philosophy')) {
+      return translate('subjectFilosofia');
+    }
+    if (lowerSubject.includes('educación ciudadana') || lowerSubject.includes('educacion ciudadana') || lowerSubject.includes('civic education')) {
+      return translate('subjectEducacionCiudadana');
+    }
+    if (lowerSubject.includes('inglés') || lowerSubject.includes('ingles') || lowerSubject === 'english') {
+      return translate('subjectIngles');
     }
     
     // Si no encuentra una traducción específica, devolver el nombre original

@@ -64,9 +64,10 @@ export default function CuestionarioPage() {
     setTopic('');
   }, [selectedCourse, selectedSubject]);
 
-  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura
+  // Analizar automáticamente los temas cuando se selecciona cualquier asignatura O cuando cambia el idioma
   useEffect(() => {
-    const analyzeKey = `${selectedCourse}_${selectedSubject}`;
+    // Incluir el idioma en la clave para forzar re-análisis cuando cambie
+    const analyzeKey = `${selectedCourse}_${selectedSubject}_${currentUiLanguage}`;
     
     if (selectedCourse && selectedSubject && hasAnalyzedRef.current !== analyzeKey) {
       hasAnalyzedRef.current = analyzeKey;
@@ -75,7 +76,7 @@ export default function CuestionarioPage() {
       setSelectedSubjectTopic('');
       setSubjectBookTitle('');
       
-      console.log('[Quiz] Starting subject analysis for:', selectedCourse, selectedSubject);
+      console.log('[Quiz] Starting subject analysis for:', selectedCourse, selectedSubject, 'Language:', currentUiLanguage);
       
       analyzeSubjectTopics({
         courseName: selectedCourse,
@@ -398,7 +399,7 @@ export default function CuestionarioPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-cyan-500">📖</span>
                         <h4 className="font-semibold text-cyan-700 dark:text-cyan-300 text-sm">
-                          Descripción:
+                          {translate('topicDescriptionLabel') || 'Descripción:'}
                         </h4>
                       </div>
                       <p className="text-xs text-cyan-600 dark:text-cyan-400">
